@@ -1629,7 +1629,10 @@ class PublisherServer {
                 if (family == STREAM_FAMILY)
                     limits.batchRecords = streamDeliveryRows_;
 
-                auto handle = queues_[family]->open(limits, peer.delivery[family], work);
+                auto handle = family == STREAM_FAMILY && streamBytes_
+                                  ? mux::detail::QueueScheduleAccess::openPublisherStream(*queues_[family], limits,
+                                                                                          peer.delivery[family], work)
+                                  : queues_[family]->open(limits, peer.delivery[family], work);
 
                 if (!handle)
                     throw Error(queueDiagnostic(handle.error(), "publisher-open-client"));
@@ -1837,16 +1840,12 @@ class PublisherServer {
                 for (std::size_t i = 0; i < familyCount_; ++i) {
                     const auto family = (peer.nextFamily + i) % familyCount_;
                     auto &delivery = *peer.delivery[family];
-                    const auto records = delivery.batch.records();
 
-                    if (!records.empty()) {
+                    if (delivery.size()) {
                         if (peer.demand[family]) {
                             try {
-                                for (auto row = delivery.cursor; row < records.size(); ++row) {
-                                    if (!delivery.suppressed[row] &&
-                                        !allowed(peer.demand, family, records[row].context, records[row].symbol))
-                                        delivery.suppressed.set(row);
-                                }
+                                detail::collectDeliveryRevocations(delivery, peer.demand[family], schema_,
+                                                                   delivery.suppressed);
                             } catch (const Error &) {
                                 return false;
                             }
@@ -1854,7 +1853,7 @@ class PublisherServer {
 
                         detail::releaseSuppressedPrefix(*peer.delivery[family], peer.handles[family]);
 
-                        if (delivery.batch.records().empty())
+                        if (!delivery.size())
                             continue;
 
                         kind = OutputKind::DATA;
@@ -1972,7 +1971,7 @@ class PublisherServer {
                 }
             }
 
-            peer.delivery[peer.outputFamily]->cursor = peer.outputEnd;
+            peer.delivery[peer.outputFamily]->advanceTo(peer.outputEnd);
             detail::releaseSuppressedPrefix(*peer.delivery[peer.outputFamily], peer.handles[peer.outputFamily]);
             break;
         }
@@ -2608,7 +2607,7 @@ class PublisherServer {
             }
 
             for (std::size_t family = 0; family < familyCount_; ++family) {
-                if (!peer.delivery[family]->batch.records().empty()) {
+                if (peer.delivery[family]->size()) {
                     peer.delivery[family]->clear();
                     (void)peer.handles[family].requestResume();
                 }
@@ -2848,7 +2847,7 @@ class PublisherServer {
                 if (const auto client = mux::detail::QueueScheduleAccess::client(queue, peer->handles[family]))
                     familyStats.queuedDeliveryRecords += client->queuedRecords;
 
-                familyStats.retainedOutputRecords += peer->delivery[family]->batch.records().size();
+                familyStats.retainedOutputRecords += peer->delivery[family]->size();
             }
         }
 

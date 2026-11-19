@@ -474,16 +474,8 @@ void add(Fixture &f, m::MuxHandle &h, std::int64_t bound = 0) {
     });
 }
 
-/** Admit one complete actual source frame after fair owner readiness.
- * @param f Actual graph.
- * @param records Ordered source tuples.
- * @param deferCallbacks Keep ready records queued while waiting for source readiness.
- */
-void send(Fixture &f, std::initializer_list<Input> records, bool deferCallbacks = false) {
-    const auto type =
-        f.family == c::SubscriptionFamily::STREAM ? 15 : (f.family == c::SubscriptionFamily::TICKER ? 10 : 20);
-    auto event = admit(f.live, data(std::span<const Input>(records.begin(), records.size()), type));
-
+/** Admit the whole event after fair owner readiness, optionally leaving callback selection deferred. */
+void submitEvent(Fixture &f, p::LiveEvent event, bool deferCallbacks) {
     for (unsigned i = 0; i < 20000; ++i) {
         auto w = turn();
         auto result = f.queue.admit(std::move(event), w);
@@ -497,6 +489,17 @@ void send(Fixture &f, std::initializer_list<Input> records, bool deferCallbacks 
     }
 
     FAIL("source admission never became ready");
+}
+
+/** Admit one complete actual source frame after fair owner readiness.
+ * @param f Actual graph.
+ * @param records Ordered source tuples.
+ * @param deferCallbacks Keep ready records queued while waiting for source readiness.
+ */
+void send(Fixture &f, std::initializer_list<Input> records, bool deferCallbacks = false) {
+    const auto type =
+        f.family == c::SubscriptionFamily::STREAM ? 15 : (f.family == c::SubscriptionFamily::TICKER ? 10 : 20);
+    submitEvent(f, admit(f.live, data(std::span<const Input>(records.begin(), records.size()), type)), deferCallbacks);
 }
 
 /** Build a real private flat source batch with the fixture's three compact fields. */
@@ -646,12 +649,20 @@ TEST_CASE("grouped replacement leaves all queue revisions and mappings intact on
 TEST_CASE("publisher delivery revokes held and unstarted TICKER and STREAM frames deterministically") {
     namespace a = org::ttldtor::qdcxx::api;
 
-    for (const auto family : {c::SubscriptionFamily::TICKER, c::SubscriptionFamily::STREAM}) {
-        SUBCASE(family == c::SubscriptionFamily::TICKER ? "TICKER" : "STREAM") {
+    const std::pair<c::SubscriptionFamily, bool> paths[]{{c::SubscriptionFamily::TICKER, false},
+                                                         {c::SubscriptionFamily::STREAM, false},
+                                                         {c::SubscriptionFamily::STREAM, true}};
+
+    for (const auto &[family, ranges] : paths) {
+        SUBCASE(family == c::SubscriptionFamily::TICKER ? "TICKER" : ranges ? "STREAM ranges" : "STREAM rows") {
             auto f = fixture(family);
             auto delivery = std::make_shared<a::detail::Delivery>();
             auto work = turn();
-            auto opened = f.queue.open(clientLimits(), delivery, work);
+            auto limits = clientLimits();
+            limits.compactRecordArena = family == c::SubscriptionFamily::STREAM;
+            auto opened = limits.compactRecordArena
+                              ? m::detail::QueueScheduleAccess::openPublisherStream(f.queue, limits, delivery, work)
+                              : f.queue.open(limits, delivery, work);
             REQUIRE(opened);
             auto handle = std::move(*opened);
             const c::SubscriptionRequest requests[]{{{f.schema.recordContext(0), u"ALPHA"}, {}},
@@ -667,7 +678,31 @@ TEST_CASE("publisher delivery revokes held and unstarted TICKER and STREAM frame
             until(f, [&] {
                 return handle.state() == m::QueueClientState::ACTIVE;
             });
-            send(f, {{0, u"ALPHA", 1, 10}, {0, u"BETA", 1, 20}, {0, u"GAMMA", 1, 30}}, true);
+
+            if (ranges) {
+                auto liveWork = liveTurn();
+                auto source = p::detail::LocalEventOwner::create(liveLimits(), liveWork);
+                REQUIRE(source);
+
+                for (std::size_t i = 0; i < std::size(requests); ++i) {
+                    const std::array fields{
+                        c::FieldValueView{c::SerialFieldType::COMPACT_INT, 0},
+                        c::FieldValueView{c::SerialFieldType::COMPACT_INT, 1},
+                        c::FieldValueView{c::SerialFieldType::COMPACT_INT, static_cast<std::int64_t>((i + 1) * 10)}};
+                    std::array row{
+                        p::detail::LocalStreamRow{0, f.schema.recordContext(0), requests[i].key.symbol, fields}};
+                    auto block =
+                        c::detail::SharedRecordPayload::copyBatch(std::span<const p::detail::LocalStreamRow>(row));
+                    row[0].shared = c::detail::SharedRecordPayload::row(block, 0);
+                    row[0].fields = row[0].shared->fields();
+                    auto event = source->stream(row, liveWork, true);
+                    REQUIRE(event);
+                    submitEvent(f, std::move(*event), true);
+                }
+            } else {
+                send(f, {{0, u"ALPHA", 1, 10}, {0, u"BETA", 1, 20}, {0, u"GAMMA", 1, 30}}, true);
+            }
+
             constexpr unsigned MAX_ROUTE_TURNS = 100;
 
             for (unsigned i = 0; i < MAX_ROUTE_TURNS && f.queue.resources(handle)->queuedRecords != 3; ++i) {
@@ -676,12 +711,24 @@ TEST_CASE("publisher delivery revokes held and unstarted TICKER and STREAM frame
             }
 
             REQUIRE(f.queue.resources(handle)->queuedRecords == 3);
-            REQUIRE(delivery->batch.records().empty());
+            REQUIRE(delivery->size() == 0);
             until(f, [&] {
-                return delivery->batch.records().size() == 3;
+                return delivery->size() == 3;
             });
             REQUIRE(delivery->cursor == 0);
-            REQUIRE(delivery->batch.records()[1].symbol == u"BETA");
+
+            if (ranges) {
+                REQUIRE(delivery->stream.size() == 3);
+
+                for (std::size_t i = 0; i < 3; ++i) {
+                    const auto range = delivery->stream.range(i);
+                    REQUIRE(range.rows.size() == 1);
+                    REQUIRE(range.selection == requests[i].projectionMask);
+                    CHECK(range.rows[0].payload->symbol() == requests[i].key.symbol);
+                }
+            } else {
+                REQUIRE(delivery->batch.records()[1].symbol == u"BETA");
+            }
 
             auto sender = session(f.schema, liveLimits(), true);
             auto receiver = session(f.schema, liveLimits(), true);
@@ -743,7 +790,7 @@ TEST_CASE("publisher delivery revokes held and unstarted TICKER and STREAM frame
 
                 REQUIRE(pending->consume(pending->pendingBytes().size()));
                 pending.reset();
-                delivery->cursor = outputEnd;
+                delivery->advanceTo(outputEnd);
                 a::detail::releaseSuppressedPrefix(*delivery, handle);
             };
             const auto compose = [&](std::size_t rows) {
@@ -799,7 +846,7 @@ TEST_CASE("publisher delivery revokes held and unstarted TICKER and STREAM frame
             writeWholeFrame();
             CHECK(delivered == std::vector<std::int64_t>{10, 30});
             CHECK(symbols == std::vector<std::u16string>{u"ALPHA", u"GAMMA"});
-            CHECK(delivery->batch.records().empty());
+            CHECK(delivery->size() == 0);
             CHECK(delivery->cursor == 0);
             CHECK_FALSE(delivery->suppressed.any());
         }
@@ -3953,9 +4000,10 @@ TEST_CASE(
 }
 
 namespace {
-thread_local bool allocationFault = false;        ///< Narrow current-thread C++ allocation interception only.
-thread_local std::size_t allocationAllowance = 0; ///< Successful requests before injected failure.
-thread_local std::size_t allocationRequests = 0;  ///< Observed requests inside the explicitly armed operation.
+thread_local bool allocationFault = false;          ///< Narrow current-thread C++ allocation interception only.
+thread_local std::size_t allocationAllowance = 0;   ///< Successful requests before injected failure.
+thread_local std::size_t allocationRequests = 0;    ///< Observed requests inside the explicitly armed operation.
+thread_local std::size_t rejectAllocationBytes = 0; ///< Exact ordinary request rejected inside a callback turn.
 thread_local const m::MuxQueue *recordQuotaProbe = nullptr;
 thread_local std::size_t observedRecordPeak = 0;
 std::atomic<void *> heldDeletePointer{
@@ -3968,6 +4016,9 @@ std::atomic<bool> deleteEntered{false}, deleteContinue{true}; ///< Deterministic
  * @return Ordinary owned backing, or bad_alloc before publication.
  */
 void *operator new(std::size_t size) {
+    if (rejectAllocationBytes && size == rejectAllocationBytes)
+        throw std::bad_alloc();
+
     if (recordQuotaProbe)
         observedRecordPeak = std::max(observedRecordPeak, recordQuotaProbe->resources().recordBytes);
 
@@ -4090,6 +4141,92 @@ TEST_CASE("flat batch transient allocations respect the aggregate record hard ce
     CHECK(admitted);
     CHECK(rejected);
 }
+
+#ifdef ORG_TTLDTOR_QDCXX_MUX_QUEUE_HAS_FEED
+TEST_CASE("publisher STREAM ranges avoid the full row-view allocation and retain both peer leases independently") {
+    namespace a = org::ttldtor::qdcxx::api;
+    auto first = std::make_shared<a::detail::Delivery>();
+    auto second = std::make_shared<a::detail::Delivery>();
+    std::weak_ptr<const c::detail::SharedRecordPayload> lifetime;
+    const char16_t *symbol = nullptr;
+    {
+        auto f = fixture(c::SubscriptionFamily::STREAM);
+        auto limits = clientLimits();
+        limits.compactRecordArena = true;
+        auto work = turn();
+        auto compact = m::detail::QueueScheduleAccess::openPublisherStream(f.queue, limits, first, work);
+        REQUIRE(compact);
+        work = turn();
+        auto ordinary = f.queue.open(limits, second, work);
+        REQUIRE(ordinary);
+        add(f, *compact);
+        add(f, *ordinary);
+        auto event = flatEvent(f.schema);
+        auto row = p::detail::SharedRecordAccess::retain(event, event.records()[0]);
+        REQUIRE(row);
+        lifetime = row;
+        symbol = row->symbol().data();
+        row.reset();
+        work = turn();
+        REQUIRE(f.queue.admit(std::move(event), work));
+
+        for (unsigned i = 0; i < 100 && f.queue.resources(*ordinary)->queuedRecords != 2; ++i) {
+            work = turn();
+            REQUIRE(f.queue.progressWithoutCallbacks(work));
+        }
+
+        REQUIRE(f.queue.resources(*compact)->queuedRecords == 2);
+        REQUIRE(f.queue.resources(*ordinary)->queuedRecords == 2);
+        const auto ordinaryBytes = f.queue.resources(*ordinary)->recordBytes;
+        bool rejected = false;
+
+        for (unsigned i = 0; i < 100 && (!first->size() || !rejected); ++i) {
+            work = turn();
+            rejectAllocationBytes = 2 * sizeof(m::MuxRecordView);
+            const auto step = f.queue.progress(work);
+            rejectAllocationBytes = 0;
+
+            if (!step) {
+                REQUIRE(step.error().error == m::QueueError::ALLOCATION_FAILURE);
+                rejected = true;
+            }
+        }
+
+        REQUIRE(rejected);
+        REQUIRE(first->stream.size() == 2);
+        REQUIRE(second->size() == 0);
+        CHECK(f.queue.resources(*ordinary)->recordBytes == ordinaryBytes);
+        CHECK(f.queue.resources(*ordinary)->queuedRecords == 2);
+        CHECK(f.queue.resources(*ordinary)->batchBytes == 0);
+        until(f, [&] {
+            return first->size() == 2 && second->size() == 2;
+        });
+        REQUIRE(first->stream.size() == 2);
+        CHECK(first->stream.range(0).rows.front().payload->symbol().data() == symbol);
+        CHECK(second->batch.records().front().symbol.data() == symbol);
+        CHECK(f.queue.resources(*ordinary)->recordBytes == f.queue.resources(*compact)->recordBytes);
+        CHECK(f.queue.resources(*compact)->batchBytes < f.queue.resources(*ordinary)->batchBytes);
+        work = turn();
+        REQUIRE(f.queue.resetSource(work));
+        until(f, [&] {
+            return compact->resetNotice().has_value();
+        });
+        REQUIRE(ordinary->requestStop(m::StopMode::ABORT) == m::ControlAdmission::RECORDED);
+        until(f, [&] {
+            return ordinary->terminal().has_value();
+        });
+    }
+    second->clear();
+    REQUIRE_FALSE(lifetime.expired());
+    REQUIRE(first->stream.range(0).rows.size() == 2);
+    CHECK(first->stream.range(0).rows.back().payload->fields()[2].raw == 10);
+    std::thread release([owner = std::move(first)] {
+        owner->clear();
+    });
+    release.join();
+    CHECK(lifetime.expired());
+}
+#endif
 
 TEST_CASE("private STREAM range transfer rolls back callback allocation failures") {
     for (std::size_t failure = 0; failure < 3; ++failure) {

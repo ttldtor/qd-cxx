@@ -60,6 +60,9 @@ On an upstream reset, an already opened HISTORY transaction or snapshot also req
 that downstream connection before a new source generation can send DATA.
 
 For TICKER and STREAM, a held delivery batch keeps the relative order of its permitted rows.
+When a byte-bounded STREAM delivery selects homogeneous record ranges, the publisher retains
+those ranges and their payload reservations through the last frame of the batch. Encoding
+reads selected rows from the retained ranges. Other deliveries use ordinary Mux record views.
 If an unstarted DATA frame contains a newly forbidden row, the whole frame is discarded and the
 permitted rows are composed again from that batch. An unaffected frame remains valid. A tracker
 notification or `getCurrentFilter()` call alone changes neither the peer policy nor upstream demand;
