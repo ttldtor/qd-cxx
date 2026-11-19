@@ -4,6 +4,15 @@
 
 Record questions about Java QD behavior that cannot yet be answered confidently. Link each question to the task investigating it and close it with source or fixture evidence.
 
+## Reading historical questions
+
+The task-labelled entries below preserve the questions and evidence available at each increment.
+Statements that a writer, mapping, TLS, transport or subscription capability remained open apply to
+that increment. Later [implemented profiles](../CURRENT-STATE.md), their linked specifications and
+validation records define the current scope. A later result supersedes an earlier exclusion only
+for its named profile; it does not broaden the older fixture or validation claim.
+The [roadmap](../NEXT-STEPS.md) separates remaining implementation from accepted design requirements.
+
 ## QDCXX-031 outgoing production witnesses
 
 The additive [production corpus](../../tests/fixtures/protocol/tape-write/CAPTURES.md) resolves
