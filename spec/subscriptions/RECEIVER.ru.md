@@ -2,6 +2,8 @@
 
 [English version](RECEIVER.md). Нормативный текст — EN.
 
+[Реестр сообщений и состояния](../protocol/MESSAGE-STATE-REGISTRY.ru.md) описывает предшествующую границу допуска протокола; декодированное семейство или флаг не подтверждает локальное участие в подписке или завершённую доставку.
+
 Подключите `qd/client/subscription_receiver.hpp` и линкуйте `qdcxx_client` с
 `ORG_TTLDTOR_QDCXX_BUILD_CLIENT=ON`. Получатель объединяет существующую
 [очередь](../mux/QUEUES.ru.md) и [подготовленные отображения событий](../events/EVENT-MAPPING.ru.md).

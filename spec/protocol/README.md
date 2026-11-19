@@ -1,5 +1,7 @@
 # QTP boundary inventory
 
+The [message and state registry](MESSAGE-STATE-REGISTRY.md) / [реестр сообщений и состояния](MESSAGE-STATE-REGISTRY.ru.md) consolidates current native decode/encode profiles and unsupported outcomes. The historical source inventory below keeps its original evidence scope.
+
 Initial descriptive result of QDCXX-004, Java QD **3.355**, commit **`0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`**. This is research, not a complete normative wire specification or C++ API decision.
 
 Evidence: **S** = inspected source; **D** = upstream documentation/comment or test assertion (not a test run); **I** = inference/proposal; **U** = unresolved or unmeasured. All source names resolve through the immutable [source inventory](SOURCES.md). **C** = executed capture, introduced by QDCXX-006 only for the bounded [measured cases](CAPTURES.md). The source inventory below remains source-level evidence unless linked to those captures.

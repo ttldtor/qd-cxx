@@ -2,6 +2,8 @@
 
 [English version](WRITER.md). Английская версия нормативная.
 
+[Реестр сообщений и состояния](../protocol/MESSAGE-STATE-REGISTRY.ru.md) связывает этот composer с направленными проверками сессии, политикой флагов и отдельным профилем записи tape.
+
 `qd/protocol/subscription_writer.hpp` и `qdcxx_protocol` предоставляют ограниченный composer
 без I/O. Реализован вывод подписок/описаний записей; live session, транспорт, согласование,
 коллекторы и подтверждение peer этим не реализованы. Профили recording `TapeWriter` не менялись.
