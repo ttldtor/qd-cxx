@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "../../src/core/delivery_statistics.hpp"
+#include "../../src/core/shared_record_block.hpp"
 #include "../../src/events/derived_order_sources.hpp"
 #include "../../src/mux/queue_replace.hpp"
 #include "../../src/mux/queue_schedule.hpp"
@@ -973,8 +974,24 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
         input[i] = {u"ALPHA", values[i]};
     }
 
-    auto batch = c::detail::SharedRecordPayload::copyBatch(std::span<const Row>(input));
-    std::weak_ptr<c::detail::SharedRecordPayload::Batch> lifetime = batch;
+    c::detail::RecordByteBudget physical(1024 * 1024);
+    auto schemaCopy = c::LocalSchema(f.schema);
+    auto binding = c::detail::RecordBlockBinding::create(std::move(schemaCopy), {37, 9}, physical);
+    REQUIRE(binding);
+    std::array<c::detail::RecordBlockInput, 2> boundInput;
+
+    for (std::size_t i = 0; i < input.size(); ++i) {
+        boundInput[i] = {f.schema.recordContext(0), input[i].symbol, input[i].fields, {}};
+        boundInput[i].metadata.senderId = static_cast<std::int32_t>(500 + i);
+        boundInput[i].metadata.fieldTime = c::detail::RecordFieldTime{-900, 0, i};
+    }
+
+    auto prepared = c::detail::SharedRecordBlock::copy(*binding, boundInput, physical);
+    REQUIRE(prepared);
+    auto batch = std::move(*prepared);
+    std::weak_ptr<const c::detail::BoundRecordBatch> lifetime = batch;
+    std::weak_ptr<const c::detail::RecordBlockBinding> schemaLifetime = *binding;
+    binding->reset();
     std::array<const c::FieldValueView *, 2> original;
     {
         auto work = liveTurn();
@@ -1005,6 +1022,13 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
         CHECK(first->retained[i].records().front().typedValues[2].raw == 40 + static_cast<std::int64_t>(i));
     }
 
+    {
+        const auto retained = lifetime.lock();
+        REQUIRE(retained);
+        CHECK(retained->binding->source == c::detail::RecordSourceGeneration{37, 9});
+        CHECK(retained->binding->schema.recordId(f.schema.recordContext(0)) == 0);
+        CHECK(retained->metadata[1].source.senderId == 501);
+    }
     CHECK(f.queue.resources().recordBytes < f.queue.resources(a)->recordBytes + f.queue.resources(b)->recordBytes);
     first->retained.front() = {};
     CHECK(f.queue.resources(a)->recordOwners == 1);
@@ -1023,6 +1047,10 @@ TEST_CASE("flat local STREAM batch shares backing across split route groups and 
     release.join();
     CHECK(valid.load());
     CHECK(lifetime.expired());
+    CHECK(schemaLifetime.expired());
+    lifetime.reset();
+    schemaLifetime.reset();
+    CHECK(physical.usedBytes() == 0);
 }
 
 TEST_CASE("scheduling observations follow pending routing retained delivery and invalid owners") {

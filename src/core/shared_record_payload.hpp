@@ -6,8 +6,11 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <limits>
 #include <memory>
+#include <span>
+#include <type_traits>
 
 namespace org::ttldtor::qdcxx::core::detail {
 
@@ -51,6 +54,13 @@ class SharedRecordPayload {
         return left + right;
     }
 
+    static std::size_t multiply(std::size_t count, std::size_t bytes) {
+        if (bytes && count > std::numeric_limits<std::size_t>::max() / bytes)
+            throw std::bad_array_new_length{};
+
+        return count * bytes;
+    }
+
     static std::size_t aligned(std::size_t offset) {
         constexpr auto ALIGNMENT = alignof(std::max_align_t);
 
@@ -58,11 +68,12 @@ class SharedRecordPayload {
     }
 
     template <class Row> static std::size_t rowBytes(const Row &row) {
-        auto bytes = add(row.fields.size() * sizeof(FieldValueView), row.symbol.size() * sizeof(char16_t));
+        auto bytes =
+            add(multiply(row.fields.size(), sizeof(FieldValueView)), multiply(row.symbol.size(), sizeof(char16_t)));
 
         for (const auto &field : row.fields) {
             if (field.units)
-                bytes = add(bytes, field.units->size() * sizeof(char16_t));
+                bytes = add(bytes, multiply(field.units->size(), sizeof(char16_t)));
 
             if (field.bytes)
                 bytes = add(bytes, field.bytes->size());
@@ -92,7 +103,7 @@ class SharedRecordPayload {
     static std::size_t controlBytes();
 
     template <class Row> static std::size_t batchBytes(std::span<const Row> rows) {
-        auto bytes = rows.size() * sizeof(SharedRecordPayload);
+        auto bytes = multiply(rows.size(), sizeof(SharedRecordPayload));
 
         for (const auto &row : rows)
             bytes = add(aligned(bytes), rowBytes(row));
@@ -100,9 +111,17 @@ class SharedRecordPayload {
         return add(bytes, controlBytes());
     }
     template <class Row> static std::shared_ptr<Batch> copyBatch(std::span<const Row> rows);
+
+    /** Fill already allocated batch storage, shared by ordinary and schema-bound owners.
+     * @tparam Rows Indexed borrowed sequence exposing size(), symbol and fields.
+     * @param batch Exclusive candidate with enough backing for batchBytes(rows) minus controlBytes().
+     * @param rows Immutable input retained only until this call returns.
+     */
+    template <class Rows> static void fillBatch(Batch &batch, const Rows &rows);
     static std::shared_ptr<const SharedRecordPayload>
     adopt(std::unique_ptr<std::byte[]> backing, std::size_t symbolUnits, std::size_t fields, std::size_t bytes);
     static std::shared_ptr<const SharedRecordPayload> row(const std::shared_ptr<Batch> &batch, std::size_t index);
+    static std::shared_ptr<const SharedRecordPayload> row(const std::shared_ptr<const Batch> &batch, std::size_t index);
 
     [[nodiscard]] const std::byte *data() const noexcept {
         return data_;
@@ -181,9 +200,24 @@ inline std::shared_ptr<const SharedRecordPayload> SharedRecordPayload::row(const
     return {batch, batch->rows + index};
 }
 
+inline std::shared_ptr<const SharedRecordPayload> SharedRecordPayload::row(const std::shared_ptr<const Batch> &batch,
+                                                                           std::size_t index) {
+    return {batch, batch->rows + index};
+}
+
 template <class Row>
 std::shared_ptr<SharedRecordPayload::Batch> SharedRecordPayload::copyBatch(std::span<const Row> rows) {
     auto batch = std::allocate_shared<Batch>(Allocator<Batch>{}, batchBytes(rows) - controlBytes());
+    fillBatch(*batch, rows);
+
+    return batch;
+}
+
+template <class Rows> void SharedRecordPayload::fillBatch(Batch &storage, const Rows &rows) {
+    static_assert(std::is_trivially_destructible_v<FieldValueView>);
+    static_assert(std::is_trivially_destructible_v<SharedRecordPayload>);
+
+    auto *batch = &storage;
     batch->rows = reinterpret_cast<SharedRecordPayload *>(batch->backing.get());
     auto offset = rows.size() * sizeof(SharedRecordPayload);
 
@@ -222,11 +256,9 @@ std::shared_ptr<SharedRecordPayload::Batch> SharedRecordPayload::copyBatch(std::
         }
 
         const auto bytes = rowBytes(input);
-        std::construct_at(batch->rows + index, batch.get(), memory, input.symbol.size(), input.fields.size(), bytes);
+        std::construct_at(batch->rows + index, batch, memory, input.symbol.size(), input.fields.size(), bytes);
         offset += bytes;
     }
-
-    return batch;
 }
 
 } // namespace org::ttldtor::qdcxx::core::detail
