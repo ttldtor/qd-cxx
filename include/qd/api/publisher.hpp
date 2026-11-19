@@ -133,14 +133,15 @@ class PublisherPolicyChange {
     [[nodiscard]] std::optional<PublisherPolicyResult> waitUntil(std::chrono::steady_clock::time_point deadline) const;
 };
 
-/** Requested local record backing, excluding the fixed FIFO entries and allocator bookkeeping. */
+/** Logical row limits and complete admitted-publication capacity; excludes allocator bookkeeping. */
 struct PublisherRecordLimits {
     static constexpr std::size_t MAX_FIELDS = 128;                    ///< Supported logical fields per submitted row.
     static constexpr std::size_t MAX_ROW_BYTES = 16 * 1024;           ///< Largest configurable row reservation.
     static constexpr std::size_t MAX_PENDING_BYTES = 8 * 1024 * 1024; ///< Largest configurable aggregate reservation.
 
-    std::size_t rowBytes = MAX_ROW_BYTES;  ///< Maximum one row's field views, UTF-16 units and opaque bytes.
-    std::size_t pendingBytes = 256 * 1024; ///< Maximum total while queued or awaiting collector processing.
+    std::size_t rowBytes = MAX_ROW_BYTES; ///< Maximum one row's field views, UTF-16 units and opaque bytes.
+    std::size_t pendingBytes =
+        256 * 1024; ///< Binding plus complete publication storage until entire collector consumption/discard.
 };
 
 /** Independent delivery and wire budgets for local STREAM. */
@@ -158,8 +159,9 @@ struct PublisherOptions {
     static constexpr std::size_t MAX_STREAM_BATCH_RECORDS = 8;  ///< Maximum local STREAM rows in one batch.
 
     transport::TcpListenerOptions listener{"127.0.0.1", 0, 16,
-                                           4};      ///< Plain numeric bind; address is borrowed at create.
-    std::size_t pendingQuotes = 64;                 ///< Maximum queued publication requests across enabled contracts.
+                                           4}; ///< Plain numeric bind; address is borrowed at create.
+    std::size_t pendingQuotes =
+        64; ///< Maximum unconsumed source rows across enabled contracts, including detached input.
     std::optional<PublisherSourceOptions> source{}; ///< Remote upstream in place of local publication.
     bool mixed = false; ///< Enable Quote/TICKER, TimeAndSale/STREAM and default Order/HISTORY on each connection.
     std::optional<PublisherCatalogOptions> catalog{}; ///< Local record publisher or full relay. Requires mixed=false.

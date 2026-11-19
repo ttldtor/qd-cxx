@@ -30,6 +30,7 @@ supported types through one owning variant-valued logical subscription.
 
 ## Protocol contracts {#protocol-contracts}
 
+- [QTP message and state registry](protocol/MESSAGE-STATE-REGISTRY.md): supported decode/encode directions, negotiated flags, state lifetimes and unsupported outcomes.
 - [QTP framing](protocol/FRAMING.md) and [tape reading](protocol/TAPE-READER.md)
 - [Subscription contracts](subscriptions/CONTRACTS.md), [live session](subscriptions/LIVE-SESSION.md), [incoming subscriptions](protocol/INCOMING-SUBSCRIPTIONS.md), [live DATA writer](protocol/LIVE-DATA-WRITE.md)
   and [local STREAM dispatch](subscriptions/CLIENT-DISPATCH.md)

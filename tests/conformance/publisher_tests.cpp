@@ -1122,7 +1122,7 @@ TEST_CASE("typed publisher atomically admits bounded STREAM batches") {
 
     const auto full = publisher.publish(std::span(sales));
     REQUIRE_FALSE(full);
-    CHECK(full.error().stage == "publisher-pending-quotes");
+    CHECK(full.error().stage == "publisher-publication-capacity");
     sales[3].symbol.clear();
     REQUIRE_FALSE(publisher.publish(std::span(sales).first(4)));
     sales[3].symbol = u"IBM";
