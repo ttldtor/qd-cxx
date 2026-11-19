@@ -136,3 +136,7 @@ keys per client per contract and 256 subscription tuples per frame also apply in
 An upstream DATA frame may contain up to 32 mapped record occurrences, even if they share one key. A frame exceeding this allowance fails the upstream generation and current demand is replayed on reconnect. Operate the relay with a source that advertises the three QTP contracts and supports `hs`.
 
 For the local catalog profile, see [publication of physical records](RECORD-PUBLICATION.md).
+
+The selected internal queue redesign is described in
+[ADR-0016: Whole-publication queue](../../docs/decisions/ADR-0016-whole-publication-queue.md).
+Its integration and performance comparison remain pending.
