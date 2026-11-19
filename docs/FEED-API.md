@@ -1123,3 +1123,10 @@ A TICKER subscription retains waiting updates in its collector so repeated value
 Use `createSubscription<events::NuamOrder>()` on a HISTORY endpoint for indexed Nuam order updates. See [NuamOrder receiving](../spec/events/NUAM-ORDER.md).
 
 [Threads, waits and object lifetime](API-THREADS.md): per-operation rules for methods, callbacks and request handles.
+
+## Planned generic record subscriptions
+
+The selected [RecordFeed contract](../spec/subscriptions/RECORD-FEED.md) defines generic
+record subscriptions through this same Endpoint and connection, alongside typed Feed.
+It preserves the complete caller schema and separates callback borrowing, explicit retention
+and selected copying. This public facade requires further implementation.
