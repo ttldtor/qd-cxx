@@ -70,3 +70,6 @@ are outside the fixed user-space table budget.
 The [loopback conformance test](../../tests/conformance/transport/tcp_listener_tests.cpp)
 drives two separate QTP framers, retires active connections and exercises
 backlog admission, stale identities and binding failures.
+
+The selected [peer execution design](PEER-EXECUTION.md) separates current serialized
+listener ownership from future peer-domain ownership transfer and scaling acceptance.
