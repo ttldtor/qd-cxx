@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include "qd/protocol/subscription_writer.hpp"
+#include "../encoding/compact_limits.hpp"
 #include "qd/encoding/penta_symbol.hpp"
 
 #include "qd/encoding/char_array.hpp"
@@ -418,14 +419,13 @@ struct SubscriptionWriter::Operation {
      * @param value Exact signed64 value; compact-long and int agree for signed32 values.
      */
     void number(std::int64_t value) {
-        std::array<std::byte, COMPACT_BYTES> bytes{};
-        const auto count = encoding::writeCompactLong(value, bytes).written;
+        const auto count = encoding::detail::compactLongSize(value);
         const auto offset = size;
 
         admit(count);
 
         if (encoding) {
-            std::copy_n(bytes.begin(), count, output.begin() + static_cast<std::ptrdiff_t>(offset));
+            encoding::detail::writeCompactLongExact(value, output.subspan(offset, count));
         }
     }
 
