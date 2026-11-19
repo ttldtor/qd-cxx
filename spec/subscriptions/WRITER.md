@@ -2,6 +2,8 @@
 
 [Русская версия](WRITER.ru.md). English is authoritative.
 
+Use the [message and state registry](../protocol/MESSAGE-STATE-REGISTRY.md) for directional session gates, flag policy and the separate recording writer profile.
+
 `qd/protocol/subscription_writer.hpp` and `qdcxx_protocol` provide a bounded, I/O-free
 composer. This implements subscription/record-description output, not a live session, transport,
 negotiation, collector or peer acknowledgement. Existing recording `TapeWriter` profiles are unchanged.

@@ -1554,6 +1554,8 @@ TEST_CASE("receive frame aliases retain frozen inline payloads committed schema 
             CHECK(first->fields().size() == event.records().front().typedValues.size());
             CHECK(first->batchIdentity() == last->batchIdentity());
             CHECK(first->sourceGeneration() == generation);
+            CHECK(first->fixedOwnerIdentity() == nullptr);
+            CHECK(first->fixedOwnerBytes() == 0);
             REQUIRE(first->schema());
             CHECK(first->schema()->recordContext(0).matches(f.context[0]));
             CHECK(first->schema()->records()[0].name == u"Alpha");

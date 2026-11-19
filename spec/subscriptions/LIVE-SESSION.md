@@ -2,6 +2,8 @@
 
 [Русская версия](LIVE-SESSION.ru.md). English is authoritative.
 
+The [message and state registry](../protocol/MESSAGE-STATE-REGISTRY.md) lists all supported identities, directional admission, negotiated flags and unsupported outcomes across live and tape profiles.
+
 `LiveSession::createServer` additionally admits the six incoming subscription message types
 through `feedServer` and the same incremental framer. The peer must advertise the exact type in its send
 direction and declare its sender record IDs. Record names in the current effective peer descriptions

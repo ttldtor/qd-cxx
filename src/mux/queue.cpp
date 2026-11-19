@@ -7,6 +7,7 @@
 #include "../collectors/stream_retention.hpp"
 #include "../collectors/ticker_transaction.hpp"
 #include "../core/delivery_statistics.hpp"
+#include "../protocol/shared_record_access.hpp"
 #include "interest_transaction.hpp"
 #include "qd/protocol/incoming_subscription.hpp"
 #include "queue_replace.hpp"
@@ -160,12 +161,15 @@ struct Measurement {
     std::size_t bytes; ///< Exact rebound count times element size.
 };
 
-/** Scalar-only aggregate ledger; no callbacks, payloads or source owners. */
+/** Detached aggregate ledger and optional immutable binding; no callbacks or native/session owners. */
 struct ContextLedger {
-    std::atomic<std::size_t> references{1};                ///< Intrusive pure metadata leases.
-    QueueLimits limits{};                                  ///< Immutable aggregate maxima.
-    std::size_t fixedCapacity = 0;                         ///< Complete preflighted owner request sum.
-    std::atomic<unsigned> stop{0};                         ///< Reserved aggregate admission cutoff.
+    std::shared_ptr<const void>
+        publicationBinding;                  ///< Exact fixed metadata, held through final detached allocation lease.
+    std::size_t publicationBindingBytes = 0; ///< Once-held fixed/reservedBytes charge, separate from payload windows.
+    std::atomic<std::size_t> references{1};  ///< Intrusive pure metadata leases.
+    QueueLimits limits{};                    ///< Immutable aggregate maxima.
+    std::size_t fixedCapacity = 0;           ///< Complete preflighted owner request sum.
+    std::atomic<unsigned> stop{0};           ///< Reserved aggregate admission cutoff.
     std::atomic<std::size_t> fixed{sizeof(ContextLedger)}; ///< Actual requested owner blocks, including this object.
     std::atomic<std::size_t> reservedBytes{sizeof(ContextLedger)}; ///< Owner blocks plus complete generation maxima.
     std::atomic<std::size_t> generations{0};         ///< Active or caller-retained retired generation reservations.
@@ -2415,6 +2419,11 @@ struct MuxQueue::State {
 
         if (!input)
             return {};
+
+        if (input->fixedOwnerIdentity() && (ledger->publicationBinding.get() != input->fixedOwnerIdentity() ||
+                                            ledger->publicationBindingBytes != input->fixedOwnerBytes())) {
+            throw QueueError::INVALID_CONFIGURATION;
+        }
 
         if (!shared) {
             auto &cache = input->queueAccounting();
@@ -5241,6 +5250,16 @@ std::expected<QueueAdmission, QueueFailure> MuxQueue::admit(protocol::LiveEvent 
                 throw QueueError::INVALID_CONTEXT;
         }
 
+        for (const auto &payload : protocol::detail::SharedRecordAccess::payloads(event, event.records())) {
+            spend(work, 1);
+
+            if (payload && payload->fixedOwnerIdentity() &&
+                (s.ledger->publicationBinding.get() != payload->fixedOwnerIdentity() ||
+                 s.ledger->publicationBindingBytes != payload->fixedOwnerBytes())) {
+                throw QueueError::INVALID_CONFIGURATION;
+            }
+        }
+
         const auto identity = event.snapshot().identity();
 
         if (s.sourceIdentity && !s.sourceIdentity->sameEpoch(identity))
@@ -5888,6 +5907,37 @@ std::expected<std::vector<QueueRangeObservation>, QueueFailure> MuxQueue::rangeS
         return std::unexpected(QueueFailure{QueueError::RESOURCE_LIMIT, {}});
     } catch (QueueFailure error) {
         return std::unexpected(error);
+    } catch (QueueError error) {
+        return std::unexpected(QueueFailure{error, {}});
+    }
+}
+
+std::expected<void, QueueFailure>
+detail::QueueScheduleAccess::bindPublicationSchema(MuxQueue &queue, std::shared_ptr<const void> binding,
+                                                   std::size_t bytes) noexcept {
+    if (!queue.state_ || !binding || !bytes) {
+        return std::unexpected(QueueFailure{QueueError::INVALID_STATE, {}});
+    }
+
+    auto &ledger = *queue.state_->ledger;
+
+    if (ledger.publicationBinding || ledger.generations.load() || queue.state_->pendingRecords) {
+        return std::unexpected(QueueFailure{QueueError::INVALID_STATE, {}});
+    }
+
+    try {
+        const auto fixed = sum(ledger.fixedCapacity, bytes);
+
+        if (!reserve(ledger.reservedBytes, bytes, ledger.limits.residentBytes)) {
+            return std::unexpected(QueueFailure{QueueError::RESOURCE_LIMIT, {}});
+        }
+
+        ledger.fixedCapacity = fixed;
+        ledger.fixed.fetch_add(bytes);
+        ledger.publicationBindingBytes = bytes;
+        ledger.publicationBinding = std::move(binding);
+
+        return {};
     } catch (QueueError error) {
         return std::unexpected(QueueFailure{error, {}});
     }

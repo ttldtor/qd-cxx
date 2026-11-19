@@ -2,6 +2,8 @@
 
 [Русская версия](HISTORY-COLLECTOR.ru.md). English is authoritative.
 
+[Common collector invariants](COLLECTOR-INVARIANTS.md) relate this family to admission, failure and ownership boundaries.
+
 The pure C++23 HISTORY boundary uses an immutable local schema, whole admitted
 [live-session events](LIVE-SESSION.md) and per-view [desired state](STATE.md).
 Its generic partition is an exact record context and UTF-16 symbol; a point is

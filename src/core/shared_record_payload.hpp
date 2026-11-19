@@ -182,6 +182,10 @@ class SharedRecordPayload {
      */
     [[nodiscard]] std::uint64_t sourceOrigin() const noexcept;
 
+    /** @return Separately reserved immutable metadata identity, or null for ordinary whole-retained accounting. */
+    [[nodiscard]] const void *fixedOwnerIdentity() const noexcept;
+    /** @return Capacity charged once to a matching metadata owner instead of every payload. */
+    [[nodiscard]] std::size_t fixedOwnerBytes() const noexcept;
     /** Worker-only weak cache; immutable bytes may be read and final aliases released on other threads. */
     [[nodiscard]] std::atomic<std::weak_ptr<void>> &queueAccounting() const noexcept;
 };
@@ -193,10 +197,12 @@ struct SharedRecordPayload::Batch {
     SharedRecordPayload *rows = nullptr;
     SharedRecordPayload single;
     std::atomic<std::weak_ptr<void>> queueAccounting;
-    bool selectionSensitive = false;     ///< Receive frames may include large unselected payloads and a binding.
-    const LocalSchema *schema = nullptr; ///< Borrowed from a pure derived owner, never a live binding plan.
-    std::uint64_t sourceGeneration = 0;  ///< Immutable committed receive label.
-    std::uint64_t sourceOrigin = 0;      ///< Pure epoch label; not global authentication.
+    bool selectionSensitive = false;          ///< Receive frames may include large unselected payloads and a binding.
+    const LocalSchema *schema = nullptr;      ///< Borrowed from a pure derived owner, never a live binding plan.
+    std::uint64_t sourceGeneration = 0;       ///< Immutable committed receive label.
+    std::uint64_t sourceOrigin = 0;           ///< Pure epoch label; not global authentication.
+    const void *fixedOwnerIdentity = nullptr; ///< Non-owning identity kept alive by the schema-bound derived batch.
+    std::size_t fixedOwnerBytes = 0;          ///< Capacity reserved once in an exact matching consumer metadata domain.
 
     explicit Batch(std::size_t size) : backing(std::make_unique_for_overwrite<std::byte[]>(size)), bytes(size) {
     }
@@ -220,7 +226,15 @@ inline std::size_t SharedRecordPayload::controlBytes() {
 }
 
 inline std::size_t SharedRecordPayload::residentBytes() const noexcept {
-    return batch_->bytes + controlBytes();
+    return batch_->bytes + controlBytes() - batch_->fixedOwnerBytes;
+}
+
+inline const void *SharedRecordPayload::fixedOwnerIdentity() const noexcept {
+    return batch_->fixedOwnerIdentity;
+}
+
+inline std::size_t SharedRecordPayload::fixedOwnerBytes() const noexcept {
+    return batch_->fixedOwnerBytes;
 }
 
 inline bool SharedRecordPayload::selectionSensitive() const noexcept {

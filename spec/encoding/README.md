@@ -33,3 +33,5 @@ UTF-16/cipher/flags, message-local repeat/MRU, explicit reset, budgets and termi
 [Java coverage](../../tests/fixtures/encoding/symbols/COVERAGE.md) and
 [C++ validation](../../tests/conformance/encoding/symbols/VALIDATION.md) replace the symbol row's
 source-only status above for this bounded subset. No writer, event decoder, negotiation or transport.
+
+[Variable payload byte accounting](VARIABLE-PAYLOAD-BYTES.md) describes native field budgets, ownership and work.

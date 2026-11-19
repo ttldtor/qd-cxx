@@ -20,6 +20,14 @@ struct QueueScheduleClient {
  * Detached lease release may run concurrently; its record reservations remain atomic.
  */
 struct QueueScheduleAccess {
+    /** Reserve one immutable publisher binding in the detached context before opening clients.
+     * @param queue Serialized queue with no active/retained generations or pending input.
+     * @param binding Exact pure metadata owner, retained by every detached context lease.
+     * @param bytes Complete modelled binding capacity, separate from payload windows.
+     * @return Success or atomic invalid-state/capacity failure.
+     */
+    static std::expected<void, QueueFailure> bindPublicationSchema(MuxQueue &queue, std::shared_ptr<const void> binding,
+                                                                   std::size_t bytes) noexcept;
     /** @return Unrouted source records, or zero for an empty owner. */
     [[nodiscard]] static std::size_t pendingRecords(const MuxQueue &queue) noexcept;
     /** @return Retained record owners, or zero for an empty queue owner. */
