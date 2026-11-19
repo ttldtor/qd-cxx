@@ -40,10 +40,11 @@ inline void discardPublications(std::shared_ptr<Publication> chain) noexcept {
     }
 }
 
-/** Worker-owned selection cursor. A completed prefix never returns whole-publication credit. */
+/** Worker-owned selection cursor. A partial prefix retains the complete credit of its publication. */
 struct PublicationCursor {
     std::shared_ptr<Publication> publication;  ///< Current publication and remaining detached FIFO.
-    std::size_t row = 0;                       ///< Next unselected row in the current immutable publication.
+    std::size_t row = 0;                       ///< First unconsumed row in the current immutable publication.
+    std::size_t selectedRows = 0;              ///< Consecutive rows staged across ready same-family publications.
     std::optional<std::size_t> applyingFamily; ///< Selection awaiting complete collector consumption.
 
     /** Reclaim any abandoned detached chain without recursion. */
@@ -55,15 +56,24 @@ struct PublicationCursor {
      * @param count Number of rows now staged for the current collector.
      */
     void staged(std::size_t count) noexcept {
-        row += count;
+        selectedRows = count;
         applyingFamily = publication->family;
     }
 
-    /** Finish a fully consumed collector selection, releasing credit only for its final publication row. */
+    /** Finish a consumed collector selection, retaining the full credit of any partially consumed publication. */
     void collected() noexcept {
         applyingFamily.reset();
+        auto remaining = std::exchange(selectedRows, 0);
 
-        if (publication && row == publication->block->count) {
+        while (publication && remaining) {
+            const auto available = publication->block->count - row;
+
+            if (remaining < available) {
+                row += remaining;
+                break;
+            }
+
+            remaining -= available;
             auto next = std::move(publication->next);
             publication.reset();
             publication = std::move(next);
@@ -71,6 +81,43 @@ struct PublicationCursor {
         }
     }
 };
+
+/** Visit consecutive ready rows of one family within the existing source quantum.
+ * @tparam Select Callable accepting a publication, first row, remaining quantum and selected offset; returns selected
+ * rows.
+ * @tparam Append Callable accepting an exhausted detached tail and appending only already-ready publication ownership.
+ * @param cursor Worker-owned first unconsumed publication; not advanced until collector acknowledgement.
+ * @param maximum Existing source row quantum.
+ * @param select Select a prefix from (publication, first, remaining quantum, selected offset); return its row count.
+ * @param append Append already-ready ownership to an exhausted detached tail, without waiting for another producer.
+ * @return Rows selected across complete publications and at most one final partial publication.
+ */
+template <class Select, class Append>
+std::size_t selectReadyPublicationRows(PublicationCursor &cursor, std::size_t maximum, Select &&select,
+                                       Append &&append) {
+    const auto family = cursor.publication->family;
+    auto *publication = cursor.publication.get();
+    auto first = cursor.row;
+    std::size_t count = 0;
+
+    while (publication && publication->family == family && count < maximum) {
+        const auto selected = select(*publication, first, maximum - count, count);
+        count += selected;
+
+        if (selected == 0 || count == maximum || first + selected != publication->block->count) {
+            break;
+        }
+
+        if (!publication->next) {
+            append(*publication);
+        }
+
+        publication = publication->next.get();
+        first = 0;
+    }
+
+    return count;
+}
 
 /** Intrusive owning FIFO. Every operation is fenced by the owning port mutex. */
 class PublicationQueue {

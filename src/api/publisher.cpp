@@ -69,6 +69,8 @@ constexpr std::size_t MIXED_LOCAL_EPOCH_BYTES = MIXED_OWNERS * (EVENT_BYTES + EV
 constexpr std::size_t MIXED_REMOTE_EPOCH_BYTES = MIXED_OWNERS * (REMOTE_EVENT_BYTES + EVENT_OWNER_ALLOWANCE);
 constexpr std::size_t QUOTE_FIELDS = 10;
 constexpr std::size_t MAX_DATA_FIELDS = 16;
+constexpr std::size_t MAX_TYPED_ROW_LOGICAL_BYTES =
+    MAX_DATA_FIELDS * sizeof(core::FieldValueView) + SYMBOL_UNITS * sizeof(char16_t);
 constexpr std::int32_t QUOTE_ID = 0;
 constexpr std::int32_t SALE_ID = 1;
 constexpr std::int32_t ORDER_ID = 2;
@@ -815,6 +817,34 @@ std::size_t publicationNodeBytes() {
         std::shared_ptr<const core::detail::BoundRecordBatch>{}, std::size_t{});
 }
 
+/** Bound a valid publication without scanning its borrowed rows.
+ * @param rows Complete requested row count.
+ * @param logicalRowBytes Maximum validated field descriptors, symbol and variable payload for one row.
+ * @return Conservative node/block allocation request; throws SIZE_OVERFLOW when the bound is unrepresentable.
+ */
+std::size_t publicationRequestBound(std::size_t rows, std::size_t logicalRowBytes) {
+    using core::detail::recordByteSum;
+    constexpr auto PADDING = alignof(std::max_align_t) - 1;
+    const auto perRow = recordByteSum(sizeof(core::detail::SharedRecordPayload) +
+                                          sizeof(core::detail::BoundRecordBatch::Metadata) + PADDING,
+                                      logicalRowBytes);
+    const auto control = core::detail::recordControlBytes<core::detail::BoundRecordBatch>(
+        core::detail::RecordByteReservation{}, std::shared_ptr<const core::detail::RecordBlockBinding>{},
+        core::detail::RecordBlockAccounting{}, std::size_t{});
+
+    return recordByteSum(publicationProduct(rows, perRow),
+                         recordByteSum(PADDING, recordByteSum(control, publicationNodeBytes())));
+}
+
+/** @param measured Exact immutable block layout.
+ * @return Complete per-publication INPUT request, excluding the once-reserved binding.
+ */
+std::size_t publicationRequestBytes(const core::detail::RecordBlockAccounting &measured) {
+    return core::detail::recordByteSum(
+        publicationNodeBytes(),
+        core::detail::recordByteSum(measured.backingAllocationBytes, measured.controlAllocationBytes));
+}
+
 /** Measure the once-held immutable binding with the existing schema-capacity model.
  * @param options Validated local/remote schema configuration.
  * @return Modelled schema capacity plus actual binding shared-control request.
@@ -849,13 +879,7 @@ std::size_t publicationInputCapacity(const PublisherOptions &options) {
     }
 
     // A single publication is the worst per-row layout: batching amortizes control/node and alignment costs.
-    const auto control = core::detail::recordControlBytes<core::detail::BoundRecordBatch>(
-        core::detail::RecordByteReservation{}, std::shared_ptr<const core::detail::RecordBlockBinding>{},
-        core::detail::RecordBlockAccounting{}, std::size_t{});
-    const auto row = sizeof(core::detail::SharedRecordPayload) + sizeof(core::detail::BoundRecordBatch::Metadata) +
-                     MAX_DATA_FIELDS * sizeof(core::FieldValueView) + SYMBOL_UNITS * sizeof(char16_t) +
-                     2 * (alignof(std::max_align_t) - 1);
-    const auto single = recordByteSum(recordByteSum(row, control), publicationNodeBytes());
+    const auto single = publicationRequestBound(1, MAX_TYPED_ROW_LOGICAL_BYTES);
 
     return recordByteSum(publicationBindingBytes(options), publicationProduct(options.pendingQuotes, single));
 }
@@ -2386,7 +2410,125 @@ class PublisherServer {
         work.bytes += 5 * bytes + 2 * peers_.size() * streamClientLimits_.batchBytes;
     }
 
-    /** Keep the complete input reservation until every row has reached its collector. */
+    /** One borrowed source selection; its immutable owner is shared without rebuilding row payloads. */
+    struct LocalSourceSelection {
+        std::shared_ptr<const core::detail::BoundRecordBatch> block; ///< Original or independently reduced backing.
+        std::size_t first;                                           ///< First selected row in this backing.
+        std::size_t count;  ///< Selected rows, bounded by the existing service quantum.
+        std::size_t charge; ///< Payload and per-row retention allowance for the selected source event.
+    };
+
+    /** Select available rows without charging a later publication beyond the remaining window.
+     * @param port Detached physical capacity for a genuinely smaller retained range.
+     * @param publication Current worker-owned publication, never a mailbox borrow.
+     * @param first First unconsumed row of this publication.
+     * @param maximum Remaining rows in the existing service quantum.
+     * @param remainingBytes Remaining source-window retention allowance, excluding its fixed event allowance.
+     * @param empty Whether no row has been selected, allowing the existing single-row soft-window exception.
+     * @return Ready selection, or no selection when a later publication must wait for the next window.
+     */
+    std::optional<LocalSourceSelection> selectLocalSource(detail::PublisherPort &port,
+                                                          const detail::Publication &publication, std::size_t first,
+                                                          std::size_t maximum, std::size_t remainingBytes,
+                                                          bool empty) const {
+        const auto &block = *publication.block;
+        auto count = std::min(maximum, block.count - first);
+
+        if (!streamBytes_ || publication.family != STREAM_FAMILY) {
+            return LocalSourceSelection{publication.block, first, count, 0};
+        }
+
+        const auto perRow = RECORD_COPY_PADDING + EVENT_OWNER_ALLOWANCE;
+        const auto retained = block.rows[0].residentBytes();
+        const auto charge = core::detail::recordByteSum(retained, count * perRow);
+
+        if (charge <= remainingBytes) {
+            return LocalSourceSelection{publication.block, first, count, charge};
+        }
+
+        if (!empty) {
+            if (retained >= remainingBytes || perRow > remainingBytes - retained) {
+                return std::nullopt;
+            }
+
+            count = std::min(count, (remainingBytes - retained) / perRow);
+
+            return LocalSourceSelection{publication.block, first, count,
+                                        core::detail::recordByteSum(retained, count * perRow)};
+        }
+
+        struct Selection {
+            const core::detail::BoundRecordBatch &block;
+            std::size_t first;
+            std::size_t count;
+
+            std::size_t size() const noexcept {
+                return count;
+            }
+
+            core::detail::RecordBlockInput operator[](std::size_t index) const {
+                const auto row = first + index;
+                const auto &metadata = block.metadata[row];
+
+                return {block.binding->schema.recordContext(metadata.localId), block.rows[row].symbol(),
+                        block.rows[row].fields(), metadata.source};
+            }
+        };
+
+        const auto fits = [&](std::size_t rows) {
+            const auto measured =
+                core::detail::SharedRecordBlock::measure(*block.binding, Selection{block, first, rows});
+
+            if (!measured) {
+                throw Error(blockDiagnostic(measured.error()));
+            }
+
+            const auto bytes =
+                core::detail::recordByteSum(measured->backingAllocationBytes, measured->controlAllocationBytes);
+
+            return core::detail::recordByteSum(bytes, rows * perRow) <= remainingBytes;
+        };
+        std::size_t low = 1, high = count;
+
+        while (low < high) {
+            const auto middle = low + (high - low + 1) / 2;
+
+            if (fits(middle)) {
+                low = middle;
+            } else {
+                high = middle - 1;
+            }
+        }
+
+        count = low;
+        auto selected = detail::selectPublicationRange(publication.block, first, count, port.physical);
+
+        if (!selected) {
+            throw Error(blockDiagnostic(selected.error()));
+        }
+
+        const auto selectedCharge = core::detail::recordByteSum((*selected)->rows[0].residentBytes(), count * perRow);
+
+        return LocalSourceSelection{std::move(*selected), 0, count, selectedCharge};
+    }
+
+    /** Append only already-ready ownership to a detached tail, without waiting to fill a quantum.
+     * @param port Commit/close fence protecting the ready mailbox.
+     * @param tail Worker-owned tail with no successor.
+     */
+    void appendReadyLocal(detail::PublisherPort &port, detail::Publication &tail) const {
+        std::shared_ptr<detail::Publication> ready;
+        {
+            const std::lock_guard lock(port.mutex);
+
+            if (!port.closed) {
+                ready = port.publications.detach();
+            }
+        }
+        tail.next = std::move(ready);
+    }
+
+    /** Keep each complete input reservation through every partial collector selection. */
     bool prepareLocal(detail::PublisherPort &port, bool streamOnly) {
         if (cursor_.applyingFamily) {
             if (mux::detail::QueueScheduleAccess::pendingRecords(*queues_[*cursor_.applyingFamily]) != 0) {
@@ -2417,83 +2559,42 @@ class PublisherServer {
             return false;
         }
 
-        const auto &block = *cursor_.publication->block;
-        auto count = family == STREAM_FAMILY ? std::min(streamSourceRows_, block.count - cursor_.row) : std::size_t{1};
-        auto selected = cursor_.publication->block;
-        auto first = cursor_.row;
+        const auto maximum = family == STREAM_FAMILY ? streamSourceRows_ : std::size_t{1};
+        const auto window = streamBytes_ && family == STREAM_FAMILY ? streamClientLimits_.recordBytes / 2 : 0;
+        auto charged = std::size_t{2 * EVENT_OWNER_ALLOWANCE};
+        const auto select = [&](const detail::Publication &publication, std::size_t first, std::size_t remainingRows,
+                                std::size_t offset) {
+            const auto remainingBytes = charged < window ? window - charged : 0;
+            auto selected = selectLocalSource(port, publication, first, remainingRows, remainingBytes, offset == 0);
 
-        if (family == STREAM_FAMILY && streamBytes_) {
-            const auto window = streamClientLimits_.recordBytes / 2;
-            const auto perRow = RECORD_COPY_PADDING + EVENT_OWNER_ALLOWANCE;
-
-            if (block.rows[0].residentBytes() + count * perRow + 2 * EVENT_OWNER_ALLOWANCE > window) {
-                struct Selection {
-                    const core::detail::BoundRecordBatch &block;
-                    std::size_t first;
-                    std::size_t count;
-
-                    std::size_t size() const noexcept {
-                        return count;
-                    }
-
-                    core::detail::RecordBlockInput operator[](std::size_t index) const {
-                        const auto row = first + index;
-                        const auto &metadata = block.metadata[row];
-
-                        return {block.binding->schema.recordContext(metadata.localId), block.rows[row].symbol(),
-                                block.rows[row].fields(), metadata.source};
-                    }
-                };
-
-                const auto fits = [&](std::size_t rows) {
-                    const auto measured =
-                        core::detail::SharedRecordBlock::measure(*block.binding, Selection{block, cursor_.row, rows});
-
-                    if (!measured) {
-                        throw Error(blockDiagnostic(measured.error()));
-                    }
-
-                    const auto charge =
-                        core::detail::recordByteSum(measured->backingAllocationBytes, measured->controlAllocationBytes);
-
-                    return core::detail::recordByteSum(charge, rows * perRow + 2 * EVENT_OWNER_ALLOWANCE) <= window;
-                };
-                std::size_t low = 1, high = count;
-
-                while (low < high) {
-                    const auto middle = low + (high - low + 1) / 2;
-
-                    if (fits(middle)) {
-                        low = middle;
-                    } else {
-                        high = middle - 1;
-                    }
-                }
-
-                count = low;
-                auto copy =
-                    detail::selectPublicationRange(cursor_.publication->block, cursor_.row, count, port.physical);
-
-                if (!copy) {
-                    throw Error(blockDiagnostic(copy.error()));
-                }
-
-                selected = std::move(*copy);
-                first = 0;
+            if (!selected) {
+                return std::size_t{0};
             }
-        }
 
-        for (std::size_t i = 0; i < count; ++i) {
-            const auto index = first + i;
-            const auto &payload = selected->rows[index];
-            const auto &metadata = selected->metadata[index];
-            sourceViews_[i] = {metadata.localId,
-                               schema_.recordContext(metadata.localId),
-                               payload.symbol(),
-                               metadata.source.removalTime ? std::span<const core::FieldValueView>{} : payload.fields(),
-                               core::detail::SharedRecordPayload::row(selected, index),
-                               metadata.source.flags,
-                               metadata.source.removalTime};
+            for (std::size_t i = 0; i < selected->count; ++i) {
+                const auto index = selected->first + i;
+                const auto &payload = selected->block->rows[index];
+                const auto &metadata = selected->block->metadata[index];
+                sourceViews_[offset + i] = {metadata.localId,
+                                            schema_.recordContext(metadata.localId),
+                                            payload.symbol(),
+                                            metadata.source.removalTime ? std::span<const core::FieldValueView>{}
+                                                                        : payload.fields(),
+                                            core::detail::SharedRecordPayload::row(selected->block, index),
+                                            metadata.source.flags,
+                                            metadata.source.removalTime};
+            }
+
+            charged = core::detail::recordByteSum(charged, selected->charge);
+
+            return selected->count;
+        };
+        const auto count = detail::selectReadyPublicationRows(cursor_, maximum, select, [&](detail::Publication &tail) {
+            appendReadyLocal(port, tail);
+        });
+
+        if (count == 0) {
+            return false;
         }
 
         auto work = liveTurn(true);
@@ -2976,55 +3077,112 @@ Publisher::Publisher(std::shared_ptr<detail::PublisherPort> port) noexcept : por
 }
 
 namespace {
+/** Reserve a whole call's row quota without hiding permanent byte oversize behind temporary row occupation.
+ * @tparam Rows Stable indexed borrowed records accepted by SharedRecordBlock::measure.
+ * @param port Detached admission domain.
+ * @param rows Complete requested rows, scanned only when byte fit cannot be proved cheaply.
+ * @param knownLayout Existing exact measurement, when the caller already validated this layout.
+ * @return Move-only reservation or permanent/temporary detached diagnostic; never reserves twice.
+ */
+template <class Rows>
+std::expected<core::detail::RecordByteReservation, Diagnostic>
+reservePublicationRows(const std::shared_ptr<detail::PublisherPort> &port, const Rows &rows,
+                       const core::detail::RecordBlockAccounting *knownLayout = nullptr) {
+    using namespace core::detail;
+    const auto admission = port->recordCount.state()->tryReserve(rows.size());
+
+    if (admission) {
+        return RecordByteReservation::adopt(port->recordCount.state(), rows.size());
+    }
+
+    if (admission.error() != RecordBlockError::WOULD_BLOCK) {
+        return std::unexpected(blockDiagnostic(admission.error()));
+    }
+
+    const auto available = port->input.state()->capacity - port->binding->retainedCapacityBytes();
+    bool byteFitGuaranteed = false;
+    try {
+        const auto logicalRowBytes = port->localRecords ? port->recordLimits.rowBytes : MAX_TYPED_ROW_LOGICAL_BYTES;
+        byteFitGuaranteed = publicationRequestBound(rows.size(), logicalRowBytes) <= available;
+    } catch (RecordBlockError) {
+        // An overflowing upper bound proves nothing about the actual borrowed request.
+    }
+    try {
+        if (!byteFitGuaranteed) {
+            auto measured = knownLayout ? std::expected<RecordBlockAccounting, RecordBlockError>(*knownLayout)
+                                        : SharedRecordBlock::measure(*port->binding, rows);
+
+            if (!measured) {
+                return std::unexpected(blockDiagnostic(measured.error()));
+            }
+
+            if (publicationRequestBytes(*measured) > available) {
+                return std::unexpected(blockDiagnostic(RecordBlockError::CAPACITY_EXCEEDED));
+            }
+        }
+
+        return std::unexpected(port->localRecords ? PENDING_RECORD_LIMIT
+                                                  : Diagnostic{ErrorCode::RESOURCE_LIMIT, "publisher-pending-quotes"});
+    } catch (RecordBlockError error) {
+        return std::unexpected(blockDiagnostic(error));
+    } catch (Diagnostic diagnostic) {
+        return std::unexpected(diagnostic);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(ALLOCATION);
+    }
+}
+
 /** Reserve the complete INPUT request before data allocation, then commit at the close fence.
  * @tparam Rows Stable indexed borrowed input exposing exact schema-bound records.
  * @param port Detached immutable binding and pure reservation domains, retained through this call.
  * @param family Collector contract shared by every row.
  * @param rows Input borrowed only until synchronous preparation finishes.
+ * @param reservedRows Optional already-reserved bulk credit; absent preserves single-row validation order.
  * @return Atomic whole-call admission or validation, allocation, capacity or close diagnostic.
  */
 template <class Rows>
 std::expected<void, Diagnostic> publishPrepared(const std::shared_ptr<detail::PublisherPort> &port, std::size_t family,
-                                                const Rows &rows) {
+                                                const Rows &rows,
+                                                std::optional<core::detail::RecordByteReservation> reservedRows = {}) {
     using namespace core::detail;
     try {
-        const auto measured = SharedRecordBlock::measure(*port->binding, rows);
+        RecordByteReservation input;
+        std::optional<Diagnostic> admissionFailure;
+        const auto admit = [&](const RecordBlockAccounting &measured) -> std::expected<void, RecordBlockError> {
+            const auto request = publicationRequestBytes(measured);
+            const auto available = port->input.state()->capacity - port->binding->retainedCapacityBytes();
 
-        if (!measured) {
-            return std::unexpected(blockDiagnostic(measured.error()));
-        }
-
-        const auto request = recordByteSum(
-            publicationNodeBytes(), recordByteSum(measured->backingAllocationBytes, measured->controlAllocationBytes));
-        const auto available = port->input.state()->capacity - port->binding->retainedCapacityBytes();
-
-        if (request > available) {
-            return std::unexpected(blockDiagnostic(RecordBlockError::CAPACITY_EXCEEDED));
-        }
-
-        RecordByteReservation count;
-        try {
-            count = RecordByteReservation(port->recordCount.state(), rows.size());
-        } catch (RecordBlockError error) {
-            if (error != RecordBlockError::WOULD_BLOCK) {
-                return std::unexpected(blockDiagnostic(error));
+            if (request > available) {
+                return std::unexpected(RecordBlockError::CAPACITY_EXCEEDED);
             }
 
-            return std::unexpected(port->localRecords
-                                       ? PENDING_RECORD_LIMIT
-                                       : Diagnostic{ErrorCode::RESOURCE_LIMIT, "publisher-pending-quotes"});
-        }
-        RecordByteReservation input(port->input.state(), request);
-        auto block =
-            SharedRecordBlock::copy(port->binding, rows, port->physical, RecordPayloadResidency::SEPARATE_BINDING);
+            if (!reservedRows) {
+                auto admission = reservePublicationRows(port, rows, &measured);
+
+                if (!admission) {
+                    // Preserve the caller's precise family-specific diagnostic without throwing an ordinary row miss.
+                    admissionFailure = admission.error();
+
+                    return std::unexpected(RecordBlockError::WOULD_BLOCK);
+                }
+
+                reservedRows.emplace(std::move(*admission));
+            }
+
+            input = RecordByteReservation(port->input.state(), request);
+
+            return {};
+        };
+        auto block = SharedRecordBlock::copyWithAdmission(port->binding, rows, port->physical, admit,
+                                                          RecordPayloadResidency::SEPARATE_BINDING);
 
         if (!block) {
-            return std::unexpected(blockDiagnostic(block.error()));
+            return std::unexpected(admissionFailure ? *admissionFailure : blockDiagnostic(block.error()));
         }
 
-        auto publication =
-            std::allocate_shared<detail::Publication>(RecordBlockAllocator<detail::Publication>{port->physical.state()},
-                                                      std::move(input), std::move(count), std::move(*block), family);
+        auto publication = std::allocate_shared<detail::Publication>(
+            RecordBlockAllocator<detail::Publication>{port->physical.state()}, std::move(input),
+            std::move(*reservedRows), std::move(*block), family);
         {
             const std::lock_guard lock(port->mutex);
 
@@ -3124,7 +3282,21 @@ std::expected<void, Diagnostic> publishEvents(const std::shared_ptr<detail::Publ
         return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-stream-batch"});
     }
 
-    return publishPrepared(port, family, TypedPublicationRows<Event, Convert>{port->binding->schema, events, convert});
+    std::optional<core::detail::RecordByteReservation> admission;
+
+    if (batch) {
+        auto rows =
+            reservePublicationRows(port, TypedPublicationRows<Event, Convert>{port->binding->schema, events, convert});
+
+        if (!rows) {
+            return std::unexpected(rows.error());
+        }
+
+        admission.emplace(std::move(*rows));
+    }
+
+    return publishPrepared(port, family, TypedPublicationRows<Event, Convert>{port->binding->schema, events, convert},
+                           std::move(admission));
 }
 
 /** Indexed adapter over caller-owned catalog input; it allocates no staging descriptors. */
@@ -3175,6 +3347,12 @@ Publisher::publishStreamRecords(std::span<const PublisherStreamRecordView> recor
         return std::unexpected(Diagnostic{ErrorCode::INVALID_ARGUMENT, "publisher-stream-batch"});
     }
 
+    auto admission = reservePublicationRows(port_, CatalogPublicationRows{records});
+
+    if (!admission) {
+        return std::unexpected(admission.error());
+    }
+
     for (const auto &row : records) {
         const auto id = port.binding->schema.recordId(row.context);
 
@@ -3190,7 +3368,7 @@ Publisher::publishStreamRecords(std::span<const PublisherStreamRecordView> recor
         }
     }
 
-    return publishPrepared(port_, STREAM_FAMILY, CatalogPublicationRows{records});
+    return publishPrepared(port_, STREAM_FAMILY, CatalogPublicationRows{records}, std::optional(std::move(*admission)));
 }
 
 std::expected<void, Diagnostic> Publisher::publishRecord(Family family, const core::RecordContext &context,

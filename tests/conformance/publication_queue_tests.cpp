@@ -489,10 +489,24 @@ TEST_CASE("row admission distinguishes a request larger than its quota from temp
 
     const bool entered = gate.entered.load(std::memory_order_acquire);
     const auto occupied = attempt(2);
+    auto invalidRecords = records;
+    invalidRecords[1].fields = {};
+    auto invalidEvents = events;
+    invalidEvents[1].symbol.clear();
+    const auto invalidAttempt = [&] {
+        if (catalogMode) {
+            return publisher.publishStreamRecords(std::span(invalidRecords).first(2));
+        }
+
+        return publisher.publish(std::span(invalidEvents).first(2));
+    };
+    const auto blockedInvalid = invalidAttempt();
     gate.release.store(true, std::memory_order_release);
     producer.join();
     CHECK(entered);
     REQUIRE(first);
+    REQUIRE_FALSE(blockedInvalid);
+    CHECK(blockedInvalid.error().stage == (catalogMode ? "publisher-pending-records" : "publisher-pending-quotes"));
     REQUIRE_FALSE(occupied);
     CHECK(occupied.error().code == q::api::ErrorCode::RESOURCE_LIMIT);
     CHECK(occupied.error().stage == (catalogMode ? "publisher-pending-records" : "publisher-pending-quotes"));
@@ -502,6 +516,18 @@ TEST_CASE("row admission distinguishes a request larger than its quota from temp
         std::this_thread::yield();
     }
 
+    CHECK((*endpoint)->getStatistics().families[1].ingressRecords.value == 1);
+    auto unblockedInvalid = invalidAttempt();
+
+    while (!unblockedInvalid && unblockedInvalid.error().code == q::api::ErrorCode::RESOURCE_LIMIT &&
+           std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::yield();
+        unblockedInvalid = invalidAttempt();
+    }
+
+    REQUIRE_FALSE(unblockedInvalid);
+    CHECK(unblockedInvalid.error().code == q::api::ErrorCode::INVALID_ARGUMENT);
+    CHECK(unblockedInvalid.error().stage == (catalogMode ? "publisher-record-shape" : "publisher-sale-shape"));
     CHECK((*endpoint)->getStatistics().families[1].ingressRecords.value == 1);
     (*endpoint)->closeAndAwaitTermination();
     CHECK((*endpoint)->getStatistics().pendingPublications == 0);
@@ -522,4 +548,201 @@ TEST_CASE("remote publisher ignores local publication byte limits including SIZE
     CHECK(refused.error().stage == "publisher-remote-source");
     (*endpoint)->closeAndAwaitTermination();
     CHECK((*endpoint)->getDiagnostic().code == q::api::ErrorCode::NONE);
+}
+
+TEST_CASE("one collector selection spans whole publications while a partial final block retains full INPUT credit") {
+    auto catalog = schema();
+    const auto context = catalog.recordContext(0);
+    d::RecordByteBudget physical(1024 * 1024);
+    auto bound = d::RecordBlockBinding::create(std::move(catalog), {}, physical);
+    REQUIRE(bound);
+    const std::array fields{q::core::FieldValueView{q::core::SerialFieldType::COMPACT_INT, 42, {}, {}}};
+    const std::array rows{
+        d::RecordBlockInput{context, u"IBM", fields, {}}, d::RecordBlockInput{context, u"IBM", fields, {}},
+        d::RecordBlockInput{context, u"IBM", fields, {}}, d::RecordBlockInput{context, u"IBM", fields, {}}};
+    std::array<std::shared_ptr<const d::BoundRecordBatch>, 4> blocks;
+    const std::array<std::size_t, 4> rowCounts{3, 2, 4, 1};
+    std::array<std::size_t, 4> charges{};
+    const auto nodeBytes =
+        d::recordControlBytes<p::Publication>(d::RecordByteReservation{}, d::RecordByteReservation{},
+                                              std::shared_ptr<const d::BoundRecordBatch>{}, std::size_t{});
+    std::size_t total = 0;
+
+    for (std::size_t i = 0; i < blocks.size(); ++i) {
+        auto copied = d::SharedRecordBlock::copy(*bound, std::span(rows).first(rowCounts[i]), physical);
+        REQUIRE(copied);
+        blocks[i] = std::move(*copied);
+        charges[i] =
+            nodeBytes + blocks[i]->accounting.backingAllocationBytes + blocks[i]->accounting.controlAllocationBytes;
+        total += charges[i];
+    }
+
+    d::RecordByteBudget input(total);
+    d::RecordByteBudget count(10);
+    p::PublicationQueue mailbox;
+    auto cursorOwner = std::make_unique<p::PublicationCursor>();
+    auto &cursor = *cursorOwner;
+
+    for (std::size_t i = 0; i < blocks.size(); ++i) {
+        mailbox.commit(std::allocate_shared<p::Publication>(
+            d::RecordBlockAllocator<p::Publication>{physical.state()},
+            d::RecordByteReservation(input.state(), charges[i]), d::RecordByteReservation(count.state(), rowCounts[i]),
+            blocks[i], i + 1 == blocks.size() ? std::size_t{0} : std::size_t{1}));
+
+        if (i == 0) {
+            cursor.publication = mailbox.detach();
+        }
+    }
+
+    {
+        const auto select = [](const p::Publication &publication, std::size_t first, std::size_t maximum, std::size_t) {
+            return std::min(maximum, publication.block->count - first);
+        };
+        const auto append = [&](p::Publication &tail) {
+            tail.next = mailbox.detach();
+        };
+        // Exercise the same ready-FIFO traversal called by prepareLocal, including a fresh mailbox detachment.
+        const auto familyRows = p::selectReadyPublicationRows(cursor, 10, select, append);
+        CHECK(familyRows == 9); // A ready TICKER cannot join the STREAM source event.
+        CHECK_FALSE(mailbox.ready());
+        const auto selected = p::selectReadyPublicationRows(cursor, 6, select, append);
+        REQUIRE(selected == 6);
+        cursor.staged(selected); // Two whole calls, then one row from the next four-row call.
+        CHECK(input.usedBytes() == total);
+        CHECK(count.usedBytes() == 10);
+        SUBCASE("collector consumes the composed selection") {
+            cursor.collected();
+            REQUIRE(cursor.publication);
+            CHECK(cursor.publication->block.get() == blocks[2].get());
+            CHECK(cursor.row == 1);
+            CHECK(input.usedBytes() == charges[2] + charges[3]);
+            CHECK(count.usedBytes() == 5); // The four-row publication remains charged in full.
+            cursor.staged(3);
+            CHECK(input.usedBytes() == charges[2] + charges[3]);
+            cursor.collected();
+            REQUIRE(cursor.publication);
+            CHECK(cursor.publication->family == 0); // The later TICKER keeps FIFO position.
+            CHECK(input.usedBytes() == charges[3]);
+            CHECK(count.usedBytes() == 1);
+            cursor.staged(1);
+            cursor.collected();
+            CHECK_FALSE(cursor.publication);
+        }
+        SUBCASE("definite discard returns the complete staged cohort") {
+            CHECK(input.usedBytes() == total);
+        }
+    }
+    cursorOwner.reset();
+    CHECK(input.usedBytes() == 0);
+    CHECK(count.usedBytes() == 0);
+    CHECK(physical.usedBytes() > 0); // Separate immutable owners still retain their physical storage.
+}
+
+TEST_CASE("byte oversize stays permanent when a valid bulk call also meets temporarily occupied row quota") {
+    auto runtime = q::transport::RuntimeBootstrap::create();
+    REQUIRE(runtime);
+    auto catalog = schema();
+    const auto context = catalog.recordContext(0);
+    const std::vector<std::vector<std::u16string>> names{{u"Value"}};
+    const std::array fields{q::core::FieldValueView{q::core::SerialFieldType::COMPACT_INT, 42, {}, {}}};
+    const q::api::PublisherStreamRecordView row{context, u"IBM", fields};
+    const std::array records{row, row};
+    const std::array events{sale(), sale()};
+
+    for (const bool catalogMode : {false, true}) {
+        INFO("catalog mode ", catalogMode);
+        q::api::PublisherOptions options;
+
+        if (catalogMode) {
+            options.catalog.emplace(catalog, names);
+        } else {
+            options.mixed = true;
+        }
+
+        options.pendingQuotes = 2;
+        options.streamBytes.emplace(512, 1024);
+        const auto attempt = [&](const q::api::Publisher &publisher, std::size_t count) {
+            if (catalogMode) {
+                return publisher.publishStreamRecords(std::span(records).first(count));
+            }
+
+            return publisher.publish(std::span(events).first(count));
+        };
+        // Find the public two-row admission boundary without rebuilding the private typed schema in the test.
+        const auto fitsEmpty = [&](std::size_t bytes) {
+            options.recordLimits.pendingBytes = bytes;
+            auto endpoint = q::api::PublisherEndpoint::create(*runtime, options);
+
+            if (!endpoint) {
+                CHECK((endpoint.error().stage == "publisher-publication-capacity" ||
+                       endpoint.error().stage == "publisher-record-limits"));
+
+                return false;
+            }
+
+            const auto result = attempt((*endpoint)->getPublisher(), 2);
+            (*endpoint)->closeAndAwaitTermination();
+
+            if (!result) {
+                CHECK(result.error().stage == "publisher-publication-capacity");
+            }
+
+            return result.has_value();
+        };
+        std::size_t low = 1;
+        auto high = options.recordLimits.pendingBytes;
+        REQUIRE(fitsEmpty(high));
+
+        while (low < high) {
+            const auto middle = low + (high - low) / 2;
+
+            if (fitsEmpty(middle)) {
+                high = middle;
+            } else {
+                low = middle + 1;
+            }
+        }
+
+        const auto exactTwoRowBytes = low;
+
+        for (const std::size_t deficit : {std::size_t{0}, std::size_t{1}}) {
+            INFO("bytes below exact boundary ", deficit);
+            options.recordLimits.pendingBytes = exactTwoRowBytes - deficit;
+            auto endpoint = q::api::PublisherEndpoint::create(*runtime, options);
+            REQUIRE(endpoint);
+            const auto publisher = (*endpoint)->getPublisher();
+            AllocationGate gate;
+            std::expected<void, q::api::Diagnostic> first;
+            std::jthread producer([&] {
+                allocationGate = &gate;
+                first = attempt(publisher, 1);
+            });
+            const auto deadline = std::chrono::steady_clock::now() + 3s;
+
+            while (!gate.entered.load(std::memory_order_acquire) && std::chrono::steady_clock::now() < deadline) {
+                std::this_thread::yield();
+            }
+
+            const bool entered = gate.entered.load(std::memory_order_acquire);
+            const auto simultaneous = attempt(publisher, 2);
+            gate.release.store(true, std::memory_order_release);
+            producer.join();
+            CHECK(entered);
+            REQUIRE(first);
+            REQUIRE_FALSE(simultaneous);
+            CHECK(simultaneous.error().code == q::api::ErrorCode::RESOURCE_LIMIT);
+            CHECK(simultaneous.error().stage == (deficit       ? "publisher-publication-capacity"
+                                                 : catalogMode ? "publisher-pending-records"
+                                                               : "publisher-pending-quotes"));
+
+            while ((*endpoint)->getStatistics().families[1].ingressRecords.value != 1 &&
+                   std::chrono::steady_clock::now() < deadline) {
+                std::this_thread::yield();
+            }
+
+            CHECK((*endpoint)->getStatistics().families[1].ingressRecords.value == 1);
+            (*endpoint)->closeAndAwaitTermination();
+            CHECK((*endpoint)->getStatistics().pendingPublications == 0);
+        }
+    }
 }

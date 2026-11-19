@@ -31,18 +31,36 @@ struct RecordByteState {
     explicit RecordByteState(std::size_t bytes) : capacity(bytes) {
     }
 
-    void reserve(std::size_t bytes) {
+    /** Attempt one capacity admission without exceptions for ordinary pressure.
+     * @param bytes Complete requested credit, in this domain's units.
+     * @return Success after one CAS admission, permanent oversize or temporarily occupied capacity; failures charge
+     * nothing.
+     */
+    [[nodiscard]] std::expected<void, RecordBlockError> tryReserve(std::size_t bytes) noexcept {
         if (bytes > capacity) {
-            throw RecordBlockError::CAPACITY_EXCEEDED;
+            return std::unexpected(RecordBlockError::CAPACITY_EXCEEDED);
         }
 
         auto current = used.load(std::memory_order_relaxed);
 
         do {
             if (bytes > capacity - current) {
-                throw RecordBlockError::WOULD_BLOCK;
+                return std::unexpected(RecordBlockError::WOULD_BLOCK);
             }
         } while (!used.compare_exchange_weak(current, current + bytes, std::memory_order_relaxed));
+
+        return {};
+    }
+
+    /** Preserve throwing admission for allocators and existing reservation constructors.
+     * @param bytes Complete requested credit, in this domain's units.
+     */
+    void reserve(std::size_t bytes) {
+        const auto admission = tryReserve(bytes);
+
+        if (!admission) {
+            throw admission.error();
+        }
     }
 };
 
@@ -486,19 +504,24 @@ class SharedRecordBlock {
         }
     }
 
-    /** Copy once into the existing packed Batch, with full schema/generation and exact metadata.
+    /** Validate once, admit synchronous preparation, then copy with that same internal layout.
+     * @tparam Admission Inline callable returning expected<void, RecordBlockError> for the observed exact accounting.
      * @tparam Rows Stable indexed sequence of RecordBlockInput values.
      * @param binding Reused immutable binding; no declaration copy is performed per block.
-     * @param rows Source valid through this synchronous call.
+     * @param rows Borrowed source logically unchanged through validation, admission and copying.
+     * @param admit Synchronous SDK-only reservation callback; never retained, must not mutate rows/binding or invoke
+     * external code.
      * @param physical Physical domain; both allocation requests reserve before constructing storage.
      * @param residency Full retain by default; separate mode requires each payload consumer to own the binding
      * reservation.
-     * @return Complete immutable block; rejection publishes no owner and restores all reservations.
+     * @return Complete immutable block or validation/admission/allocation failure; no owner is published on rejection.
+     * Callback-owned credits must use caller RAII. Other callback exceptions propagate after local rollback.
      */
-    template <class Rows>
+    template <class Rows, class Admission>
     static std::expected<std::shared_ptr<const BoundRecordBatch>, RecordBlockError>
-    copy(std::shared_ptr<const RecordBlockBinding> binding, const Rows &rows, const RecordByteBudget &physical,
-         RecordPayloadResidency residency = RecordPayloadResidency::WHOLE_RETAINED) {
+    copyWithAdmission(std::shared_ptr<const RecordBlockBinding> binding, const Rows &rows,
+                      const RecordByteBudget &physical, Admission &&admit,
+                      RecordPayloadResidency residency = RecordPayloadResidency::WHOLE_RETAINED) {
         if (!binding) {
             return std::unexpected(RecordBlockError::WRONG_CONTEXT);
         }
@@ -510,6 +533,12 @@ class SharedRecordBlock {
         }
 
         try {
+            const auto admission = std::forward<Admission>(admit)(*measured);
+
+            if (!admission) {
+                return std::unexpected(admission.error());
+            }
+
             // Test the whole permanent request, not its two individually allocatable pieces.
             const auto requested = recordByteSum(measured->backingAllocationBytes, measured->controlAllocationBytes);
 
@@ -548,6 +577,26 @@ class SharedRecordBlock {
         } catch (const std::bad_alloc &) {
             return std::unexpected(RecordBlockError::ALLOCATION_FAILURE);
         }
+    }
+
+    /** Copy once into the packed Batch after complete schema/shape validation.
+     * @tparam Rows Stable indexed sequence of RecordBlockInput values.
+     * @param binding Reused immutable binding; no declaration copy is performed per block.
+     * @param rows Source logically unchanged through this synchronous call.
+     * @param physical Physical domain; both allocation requests reserve before constructing storage.
+     * @param residency Full retain by default; separate mode requires a matching consumer binding reservation.
+     * @return Complete immutable block; rejection publishes no owner and restores all reservations.
+     */
+    template <class Rows>
+    static std::expected<std::shared_ptr<const BoundRecordBatch>, RecordBlockError>
+    copy(std::shared_ptr<const RecordBlockBinding> binding, const Rows &rows, const RecordByteBudget &physical,
+         RecordPayloadResidency residency = RecordPayloadResidency::WHOLE_RETAINED) {
+        return copyWithAdmission(
+            std::move(binding), rows, physical,
+            [](const RecordBlockAccounting &) {
+                return std::expected<void, RecordBlockError>{};
+            },
+            residency);
     }
 
     /** Independently copy a contiguous selection without allocating a staging descriptor array.
