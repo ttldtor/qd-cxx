@@ -2,6 +2,10 @@
 
 [Русская версия](RECORD-PUBLICATION.ru.md).
 
+The [resource-limit contract](RESOURCE-LIMITS.md) classifies the current source-row,
+batch and per-peer storage limits and the accepted byte-budget replacement policy.
+The current admission limits below remain effective until that migration is verified.
+
 A local publisher can be configured with a validated, immutable catalog and its ordered outbound field names. The endpoint owns that configuration. A publication identifies one catalog record, one collector contract and one exact symbol. Use the existing owning `RecordContext` provenance for record identity. Copies of the same validated catalog retain provenance. A context from an independently validated catalog fails even when its numeric record ID matches. Receivers can independently assign their wire IDs.
 
 ## Values and admission
