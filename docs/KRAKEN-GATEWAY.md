@@ -65,3 +65,5 @@ Use `--listen-port 0` to request an ephemeral port. Pass the actual port from th
 Each Quote carries the exact wide-decimal prices and sizes. Quote timestamps, sequence and exchange codes are zero. The optional `--trace-quotes` output includes the provider timestamp and admitted raw Quote values. TICKER can combine intermediate updates. The stats line reports local publication and transport metrics. To verify client delivery, inspect the quotes received at each client.
 
 Use `--source-host`, `--source-identity` and `--source-port` to select a compatible local WSS replay peer and pass its trust PEM. The HTTP path is `/v2`. The gateway supports this one public source profile and plaintext QTP on IPv4 loopback.
+
+See the [BBO and continuity contract](../spec/transport/KRAKEN-SUBSCRIPTION.md#bbo-values-and-continuity) for mapping, freshness and gap limits.
