@@ -46,3 +46,17 @@ if(TARGET qdcxx_feed)
         set_tests_properties(event_nettest_help PROPERTIES TIMEOUT 20)
     endif()
 endif()
+
+if(BUILD_TESTING AND (WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+    find_program(ORG_TTLDTOR_QDCXX_METRICS_PWSH NAMES pwsh)
+    if(ORG_TTLDTOR_QDCXX_METRICS_PWSH)
+        add_test(NAME process_thread_metrics COMMAND "${CMAKE_COMMAND}"
+            "-DPWSH=${ORG_TTLDTOR_QDCXX_METRICS_PWSH}"
+            "-DSCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/benchmark/Test-ProcessMetrics.ps1"
+            "-DRUN=${CMAKE_CURRENT_BINARY_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/benchmark/ProcessMetricsTest.cmake")
+        set_tests_properties(process_thread_metrics PROPERTIES TIMEOUT 120)
+    else()
+        message(STATUS "PowerShell unavailable: process_thread_metrics is not registered")
+    endif()
+endif()
