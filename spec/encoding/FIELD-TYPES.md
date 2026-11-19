@@ -9,6 +9,94 @@ and [capture report](../../tests/fixtures/encoding/field-types/CAPTURES.md) dist
 diagnostic inputs and reproducibility checks. The lock remains unchanged. This is field support,
 not a Profile event adapter or evidence of complete private-tape compatibility.
 
+## Field identity contract map
+
+This map covers every named C++ `SerialFieldType` in
+[`serial_field_type.hpp`](../../include/qd/core/serial_field_type.hpp). Each row is an exact full
+identity. Read admission still requires the selected local profile; writer, inspector and event
+adapter admission have separate contracts. `I32` means INT32_MIN..INT32_MAX and `I64` means
+INT64_MIN..INT64_MAX. A compact read consumes the whole compact-long encoding before any signed
+low-32-bit projection. A scalar has no nullable payload; its raw zero default is a value, even when
+a separate decimal/event accessor interprets those bits as NaN or missing business data.
+
+Java local fields below are the consumers used by the existing oracle. Ordinary int fields use one
+Java int slot. `LongField`, `WideDecimalField` and `TimeMillisField` use two physical int slots with a
+VOID tail: high32 occupy the first slot, low32 the tail slot; each produces one logical C++ value.
+Object fields use their independent object-slot
+index. BYTE/SHORT have no default Java field factory and use the explicitly labelled type-8 consumer.
+An explicit wire VOID and a physical storage tail are different cases.
+
+| Full identity (base + representation) | Physical wire value | Java local field / C++ value | Null and range | Evidence and unsupported case |
+| --- | --- | --- | --- | --- |
+| 0 `VOID_FIELD` (0 + 0x00) | No bytes | `VoidIntField` slot stays zero; `raw=0` | No null; only zero | S; Java elides VOID actions; no delivered logical field or synthetic tail |
+| 1 `BYTE` (1 + 0x00) | Signed byte | `CompactIntField` consumer 8; sign-extended `raw` | No null; -128..127 | S; default Java BYTE factory returns null |
+| 2 `UTF_CHAR` (2 + 0x00) | One UTFChar, 1..4 bytes | `CompactCharField`; code point in `raw` | No null; 0..0x10ffff, including surrogates | Q; invalid lead/tail/range rejected; no char16 truncation in generic value |
+| 3 `SHORT` (3 + 0x00) | Signed big-endian 16 bits | `CompactIntField` consumer 8; sign-extended `raw` | No null; -32768..32767 | S; default Java SHORT factory returns null |
+| 4 `INT` (4 + 0x00) | Signed big-endian 32 bits | `PlainIntField`; sign-extended `raw` | No null; I32 | S; incomplete fixed-width values fail |
+| 8 `COMPACT_INT` (8 + 0x00) | Compact long, signed low32 | `CompactIntField`; sign-extended `raw` | No null; I32 | E; accepted wider encodings project low32; no high32 retention |
+| 9 `BYTE_ARRAY` (9 + 0x00) | Compact LONG byte count, then bytes | `ByteArrayField`; `bytes`, `raw=0` | -1 null; 0 empty; count <= INT32_MAX | O; no UTF or object interpretation |
+| 10 `UTF_CHAR_ARRAY` (10 + 0x00) | Compact LONG unit count, then BMP UTFChars | `StringField(false)`; `units`, `raw=0` | -1 null; 0 empty; count <= INT32_MAX | E; supplementary scalar rejected; exact surrogate units retained |
+| 24 `DECIMAL` (8 + 0x10) | Compact long, signed low32 | `DecimalField`; exact raw decimal bits | No null; I32 | S; generic field does not convert to double or validate a business range |
+| 40 `SHORT_STRING` (8 + 0x20) | Compact long, signed low32 | `ShortStringField`; packed bits in `raw` | No null; I32 | E; no generic text conversion or text validation |
+| 56 `TIME_SECONDS` (8 + 0x30) | Compact long, signed low32 | `TimeSecondsField`; raw seconds | No null; I32 | Q; no generic millisecond conversion or event-time metadata |
+| 72 `SEQUENCE` (8 + 0x40) | Compact long, signed low32 | `SequenceField`; packed bits in `raw` | No null; I32 | E; no generic unpacking; independent of heartbeat sequence |
+| 88 `DATE` (8 + 0x50) | Compact long, signed low32 | `DateField`; raw day identifier | No null; I32 | E; no calendar validation or date conversion |
+| 104 `LONG` (8 + 0x60) | Compact long, all signed64 | `LongField`; exact `raw` | No null; I64 | S; no logical VOID tail or low32 narrowing |
+| 120 `WIDE_DECIMAL` (8 + 0x70) | Compact long, all signed64 | `WideDecimalField`; exact raw decimal bits | No null; I64 | Q; generic storage retains noncanonical/special bits; conversion is separate |
+| 137 `STRING` (9 + 0x80) | Compact LONG byte count, then UTFString body | `StringField(true)`; `units`, `raw=0` | -1 null; 0 empty; byte count <= 4*INT32_MAX | O; exact UTF-16; byte count is not type-10 unit count; malformed UTF fails |
+| 152 `TIME_MILLIS` (8 + 0x90) | Compact long, all signed64 | `TimeMillisField`; raw milliseconds | No null; I64 | S; no generic event-time conversion or nanosecond identity |
+| 233 `CUSTOM_OBJECT` (9 + 0xe0) | Compact LONG byte count, then opaque bytes | Oracle uses `ByteArrayField` local 9; `bytes`, `raw=0` | -1 null; 0 empty; count <= INT32_MAX | O; requested composer proves wire233; FileWriter emits local9; no custom object execution |
+| 249 `SERIAL_OBJECT` (9 + 0xf0) | Compact INT byte count (signed low32), then opaque bytes | `MarshalledObjField.getBytes`; `bytes`, `raw=0` | -1 null; 0 empty; projected count <= INT32_MAX | O; no deserialization/class loading; unknown Java skip uses a different grammar |
+
+All nullable count domains start at -1; lower counts fail. Null and empty are distinct owned values.
+Wire-domain maxima do not grant allocation: finite per-value, cumulative work and ownership budgets
+below may reject an otherwise legal count. UTFString also bounds decoded UTF-16 units. Both payload
+members are absent for scalars; `bytes` is absent for 10/137, and `units` is absent for 9/233/249.
+Manually constructed values with a wrong raw range, nonzero payload raw or incompatible payload member
+fail `validFieldValue`/`validFieldValueView`. Views borrow payload storage and require the lifetime
+rules in [record ownership](../schema/RECORD-OWNERSHIP.md); the owning representation retains no input,
+schema or Java callback storage.
+
+### Evidence keys and version boundaries
+
+- **E:** locked QD 3.355 [field primitives](../../tests/fixtures/encoding/field-types/expected/primitives.tsv),
+  [physical/local schema](../../tests/fixtures/encoding/field-types/expected/schema.tsv) and
+  [coverage](../../tests/fixtures/encoding/field-types/COVERAGE.md). Wider 40/72/88 recordings retain
+  projection and sentinel alignment separately from primitive observations.
+- **Q:** locked QD 3.355 [Quote primitive and production coverage](../../tests/fixtures/protocol/quote/COVERAGE.md)
+  and [exact value contract](QUOTE-VALUES.md), including UTFChar and all signed64 wide-decimal bits.
+- **S:** QD 3.355 and 3.356 [scalar samples](../../tests/fixtures/encoding/field-types/expected/scalars/samples.tsv),
+  [manifest](../../tests/fixtures/encoding/field-types/scalar-captures.json) and
+  [validation](../../tests/conformance/protocol/field-types/SCALAR-VALIDATION.md). BYTE/SHORT requested
+  composer and parser evidence is separate from FileWriter recordings; VOID has its own qualification.
+- **O:** QD 3.355 and 3.356 [object samples](../../tests/fixtures/encoding/field-types/expected/objects/samples.tsv),
+  [manifest](../../tests/fixtures/encoding/field-types/object-captures.json) and
+  [validation](../../tests/conformance/protocol/field-types/OBJECT-VALIDATION.md). Known137/249 consumer
+  observations select UTFString/projected-INT grammar; C++ intentionally keeps it when skipping.
+
+These keys identify existing recorded evidence, not a new capture or a claim that every primitive
+observation was a FileReader callback. [upstream.lock](../../upstream.lock) remains QD 3.355 at
+`0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`; the S/O second pin is QD 3.356 at
+`f71e4cb390d1586f2d4e3a83d9b9067e3326ef19`. Other-version benchmarks do not qualify these rows.
+Primary source defines [identities and factories](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/SerialFieldType.java)
+and [production read/storage dispatch](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java);
+[RecordCursor long storage](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java#L1331-L1342)
+defines the physical high32/low32 order.
+
+### Identities outside this map
+
+Java's deprecated `TIME` names the existing full56 `TIME_SECONDS`; it adds no wire identity.
+Java full168 `TIME_NANOS` (8 + 0xa0) is reserved. It has no supported C++ enumerator, value contract,
+null/range promise or field oracle acceptance in this map; C++ rejects it even though its base is8.
+Reserved base IDs5/6/7/11..15, unnamed selector combinations, negative IDs and unknown high bits
+likewise fail exact profile admission. Java factory fallback or matching masked serialization bits
+never authorizes a C++ identity. Composition/decomposition helpers do not validate these cases.
+
+The map preserves wire representation and generic values. [Schema-bound event conversions](../events/FIELD-CONVERSIONS.md),
+Java wire-to-local conversion/recovery, object access and producer selection remain separate contracts;
+none follows merely from a shared base or a named local field. Existing fixtures are sufficient for
+this reference map and remain unchanged.
+
 ## Explicit binary field profile
 
 `LocalProfile::BINARY_FIELDS_V1` is an opt-in, ordinary subset of
