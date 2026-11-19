@@ -456,3 +456,184 @@ TEST_CASE("successful repeated copy and measurement reuse the qualified shared c
 
     CHECK(d::recordControlMeasurementCount.load() == probes);
 }
+
+TEST_CASE("separate binding residency preserves complete retained capacity and range policy") {
+    Fixture f;
+    auto block = d::SharedRecordBlock::copy(f.binding, f.rows, f.physical, d::RecordPayloadResidency::SEPARATE_BINDING);
+    REQUIRE(block);
+    const auto payload = d::SharedRecordPayload::row(*block, 0);
+    CHECK(payload->fixedOwnerIdentity() == f.binding.get());
+    CHECK(payload->fixedOwnerBytes() == f.binding->retainedCapacityBytes());
+    CHECK(payload->residentBytes() + payload->fixedOwnerBytes() ==
+          ((*block)->accounting.backingAllocationBytes + (*block)->accounting.controlAllocationBytes +
+           f.binding->retainedCapacityBytes()));
+    auto selection = d::SharedRecordBlock::copyRange(**block, 1, 1, f.physical);
+    REQUIRE(selection);
+    CHECK((*selection)->residency == d::RecordPayloadResidency::SEPARATE_BINDING);
+    CHECK((*selection)->rows[0].fixedOwnerIdentity() == f.binding.get());
+    CHECK((*selection)->metadata[0].source == f.rows[1].metadata);
+    CHECK((*selection)->rows[0].fields()[0].raw == f.rows[1].fields[0].raw);
+    const auto full = ((*selection)->accounting.backingAllocationBytes +
+                       (*selection)->accounting.controlAllocationBytes + f.binding->retainedCapacityBytes());
+    d::RecordByteBudget consumer(full);
+    auto retained = d::SharedRecordBlock::retain(*selection, 0, 1, consumer);
+    REQUIRE(retained);
+    CHECK(consumer.usedBytes() == full);
+    CHECK(consumer.usedBytes() > (*selection)->rows[0].residentBytes());
+    retained = std::unexpected(d::RecordBlockError::INVALID_RANGE);
+    CHECK(consumer.usedBytes() == 0);
+}
+
+TEST_CASE("nonthrow reservation preserves permanent and occupied errors and adopts one exact credit") {
+    d::RecordByteBudget budget(8);
+    static_assert(noexcept(budget.state()->tryReserve(1)));
+    const auto oversized = budget.state()->tryReserve(9);
+    REQUIRE_FALSE(oversized);
+    CHECK(oversized.error() == d::RecordBlockError::CAPACITY_EXCEEDED);
+    CHECK(budget.usedBytes() == 0);
+    {
+        const auto accepted = budget.state()->tryReserve(8);
+        REQUIRE(accepted);
+        auto owner = d::RecordByteReservation::adopt(budget.state(), 8);
+        CHECK(budget.usedBytes() == 8);
+        const auto occupied = budget.state()->tryReserve(1);
+        REQUIRE_FALSE(occupied);
+        CHECK(occupied.error() == d::RecordBlockError::WOULD_BLOCK);
+        const auto tooLarge = budget.state()->tryReserve(9);
+        REQUIRE_FALSE(tooLarge);
+        CHECK(tooLarge.error() == d::RecordBlockError::CAPACITY_EXCEEDED);
+        CHECK(budget.usedBytes() == 8);
+        bool legacyBlocked = false;
+        try {
+            budget.state()->reserve(1);
+        } catch (d::RecordBlockError error) {
+            legacyBlocked = error == d::RecordBlockError::WOULD_BLOCK;
+        }
+        CHECK(legacyBlocked);
+        CHECK(budget.usedBytes() == 8);
+        auto finalOwner = std::move(owner);
+        CHECK(budget.usedBytes() == 8);
+    }
+    CHECK(budget.usedBytes() == 0);
+    CHECK_THROWS_AS(budget.state()->reserve(9), d::RecordBlockError);
+    CHECK(budget.usedBytes() == 0);
+    REQUIRE(budget.state()->tryReserve(8));
+    {
+        const auto owner = d::RecordByteReservation::adopt(budget.state(), 8);
+        CHECK(budget.usedBytes() == 8);
+    }
+    CHECK(budget.usedBytes() == 0);
+}
+
+TEST_CASE("copy admission observes one validated layout before data allocation and cannot supply a foreign layout") {
+    Fixture f;
+    const auto baseline = f.physical.usedBytes();
+
+    struct ObservedRows {
+        const std::array<d::RecordBlockInput, 3> &rows;
+        std::size_t &reads;
+
+        std::size_t size() const noexcept {
+            return rows.size();
+        }
+
+        const d::RecordBlockInput &operator[](std::size_t index) const {
+            ++reads;
+
+            return rows[index];
+        }
+    };
+
+    std::size_t reads = 0, admissions = 0, readsAtAdmission = 0, descriptorsAtAdmission = 0;
+    const ObservedRows rows{f.rows, reads};
+    const auto decline = [&](const d::RecordBlockAccounting &layout) -> std::expected<void, d::RecordBlockError> {
+        ++admissions;
+        readsAtAdmission = reads;
+        descriptorsAtAdmission = layout.rowDescriptorBytes;
+
+        return std::unexpected(d::RecordBlockError::WOULD_BLOCK);
+    };
+    std::expected<std::shared_ptr<const d::BoundRecordBatch>, d::RecordBlockError> rejected;
+    {
+        AllocationScope noAllocation(0);
+        rejected = d::SharedRecordBlock::copyWithAdmission(f.binding, rows, f.physical, decline);
+    }
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error() == d::RecordBlockError::WOULD_BLOCK);
+    CHECK(admissions == 1);
+    CHECK(readsAtAdmission == rows.size());
+    CHECK(descriptorsAtAdmission == rows.size() * sizeof(d::SharedRecordPayload));
+    CHECK(reads == rows.size()); // Declining admission performs no fill or second validation pass.
+    CHECK(f.physical.usedBytes() == baseline);
+    auto invalid = f.rows;
+    invalid[0].fields = {};
+    {
+        AllocationScope noAllocation(0);
+        rejected = d::SharedRecordBlock::copyWithAdmission(f.binding, invalid, f.physical, decline);
+    }
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error() == d::RecordBlockError::INVALID_RECORD);
+    CHECK(admissions == 1); // Invalid source cannot reach the admission callback.
+    CHECK(f.physical.usedBytes() == baseline);
+}
+
+TEST_CASE("callback failure and physical pressure roll back caller admission without publishing a partial block") {
+    Fixture f;
+    const auto baseline = f.physical.usedBytes();
+    const auto measured = d::SharedRecordBlock::measure(*f.binding, f.rows);
+    REQUIRE(measured);
+    const auto requested = measured->backingAllocationBytes + measured->controlAllocationBytes;
+    d::RecordByteBudget input(requested);
+
+    struct AdmissionFailure {};
+
+    std::size_t admissions = 0;
+    const auto attempt = [&](const d::RecordByteBudget &physical, bool fail) {
+        d::RecordByteReservation inputOwner;
+        const auto admit = [&](const d::RecordBlockAccounting &layout) -> std::expected<void, d::RecordBlockError> {
+            ++admissions;
+            inputOwner =
+                d::RecordByteReservation(input.state(), layout.backingAllocationBytes + layout.controlAllocationBytes);
+
+            if (fail) {
+                throw AdmissionFailure{};
+            }
+
+            return {};
+        };
+
+        return d::SharedRecordBlock::copyWithAdmission(f.binding, f.rows, physical, admit);
+    };
+    CHECK_THROWS_AS(attempt(f.physical, true), AdmissionFailure);
+    CHECK(input.usedBytes() == 0);
+    CHECK(f.physical.usedBytes() == baseline);
+    d::RecordByteBudget small(requested - 1);
+    auto rejected = attempt(small, false);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error() == d::RecordBlockError::CAPACITY_EXCEEDED);
+    CHECK(input.usedBytes() == 0);
+    CHECK(small.usedBytes() == 0);
+    d::RecordByteBudget one(requested);
+    auto existing = d::SharedRecordBlock::copy(f.binding, f.rows, one);
+    REQUIRE(existing);
+    rejected = attempt(one, false);
+    REQUIRE_FALSE(rejected);
+    CHECK(rejected.error() == d::RecordBlockError::WOULD_BLOCK);
+    CHECK(input.usedBytes() == 0);
+    CHECK(one.usedBytes() == requested);
+    existing->reset();
+    CHECK(one.usedBytes() == 0);
+
+    for (std::size_t allowed = 0; allowed < 2; ++allowed) {
+        const auto before = admissions;
+        {
+            AllocationScope failure(allowed);
+            rejected = attempt(f.physical, false);
+        }
+        REQUIRE_FALSE(rejected);
+        CHECK(rejected.error() == d::RecordBlockError::ALLOCATION_FAILURE);
+        CHECK(admissions == before + 1);
+        CHECK(input.usedBytes() == 0);
+        CHECK(f.physical.usedBytes() == baseline);
+    }
+}

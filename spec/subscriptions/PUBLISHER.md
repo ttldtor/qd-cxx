@@ -137,6 +137,43 @@ An upstream DATA frame may contain up to 32 mapped record occurrences, even if t
 
 For the local catalog profile, see [publication of physical records](RECORD-PUBLICATION.md).
 
-The selected internal queue redesign is described in
+## Publication ownership and capacity
+
+A successful publish call commits one immutable owning publication. Preparation, validation and copying
+happen outside the mailbox mutex; the link and close share one fence. Concurrent producers are ordered
+by successful commit. Non-overlapping calls from one producer preserve call order, and the rows of one
+call remain contiguous at this handoff. Validation, capacity and allocation failures admit no prefix.
+A producer already preparing during close may safely finish its detached work, then receive `CLOSED`.
+No retained publication, schema or reservation depends on a native runtime after termination.
+
+`pendingQuotes` bounds unconsumed source rows, including the worker's detached publication. In catalog
+and explicit byte modes, `recordLimits.pendingBytes` includes one immutable binding reservation plus
+each publication's queue node/shared control, packed descriptors, source metadata, payload, alignment
+and block control. `rowBytes` continues to bound one row's logical field descriptors, symbol and variable
+payload. A budget too small for the fixed binding is rejected at endpoint creation. A complete request whose bytes or row count
+cannot fit an empty input domain reports `RESOURCE_LIMIT` at `publisher-publication-capacity`;
+Temporary byte occupancy reports `publisher-pending-records`; row-quota occupancy uses `publisher-pending-quotes` for typed publication and `publisher-pending-records` for catalog publication. The legacy typed profile derives a finite byte
+capacity from its existing row count and worst single-publication layout, preserving its row capacity.
+
+The complete input credit remains charged across detachment and all partial worker steps. It is returned
+only after the collector consumes the entire publication or the publication is definitively discarded;
+socket delivery is independent. Physical storage remains charged through its final owning reference
+(and a shared control through final weak release). The binding uses the existing `LocalSchema` capacity
+model; allocation bookkeeping, stacks and operating-system buffers are outside this accounting.
+
+The source epoch and detached Mux context each reserve and retain the same immutable binding once in
+their independent metadata domains. Payload-only rows require that exact owner; a missing or different
+binding is rejected before admission. Per-frame and per-client payload windows therefore do not repeatedly
+charge the catalog. The ordinary full-capacity block retain continues to include its complete binding.
+The physical domain is finite and conservatively derives from the input, source epoch, collector/cache
+and Mux/consumer capacities; these independent reservations do not describe an exact RSS limit.
+
+The worker detaches ready publications without waiting for another row. Its service quantum, delivery
+window and QTP frame size remain independent of input capacity and generator call size. When retaining
+an entire payload would exceed a downstream window, the collector selection receives a separately owned
+packed range. This copy occurs at the retention boundary and keeps the original whole-publication input
+credit until all ranges are consumed. A single valid row retains the existing soft-window allowance.
+
+The implementation follows
 [ADR-0016: Whole-publication queue](../../docs/decisions/ADR-0016-whole-publication-queue.md).
-Its integration and performance comparison remain pending.
+The matched performance comparison is recorded separately.

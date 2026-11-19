@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
-#include "../core/shared_record_payload.hpp"
+#include "../core/shared_record_block.hpp"
 #include "qd/protocol/live_session.hpp"
 
 namespace org::ttldtor::qdcxx::protocol::detail {
@@ -14,6 +14,8 @@ struct LocalStreamRow {
     std::u16string_view symbol;
     std::span<const core::FieldValueView> fields;
     std::shared_ptr<const core::detail::SharedRecordPayload> shared{};
+    std::int32_t flags = 0;                  ///< Exact physical indexed controls for the selected family.
+    std::optional<std::int64_t> removalTime; ///< Explicit raw removal key; logical fields are absent.
 };
 
 /** One private synthetic source epoch with the usual counted event backing. */
@@ -49,11 +51,25 @@ class LocalEventOwner {
                std::optional<std::int64_t> removalTime, std::optional<FieldEventTime> eventTime, LiveWork &work) const;
 
     public:
-    [[nodiscard]] static std::expected<LocalEventOwner, LiveError> create(LiveLimits limits, LiveWork &work);
+    /** Create a pure source epoch, optionally reserving shared immutable binding metadata once.
+     * @param limits Independent finite epoch and per-event capacities.
+     * @param work Mutable creation work credits.
+     * @param binding Exact detached metadata owner required by payload-only rows; empty preserves ordinary behavior.
+     * @return Pure source owner or atomic creation/reservation failure.
+     */
+    [[nodiscard]] static std::expected<LocalEventOwner, LiveError>
+    create(LiveLimits limits, LiveWork &work, std::shared_ptr<const core::detail::RecordBlockBinding> binding = {});
 
-    /** Copy an ordered batch into one STREAM owner. Compact mode sizes the arena from the actual rows. */
+    /** Project an ordered selection into one ordinary event, retaining matching shared payloads.
+     * @param rows Borrowed rows with exact owning payload aliases, if supplied.
+     * @param work Mutable allocation/visit/text credits.
+     * @param compact Size the arena from actual rows and retain compatible shared backing.
+     * @param type Existing data family; STREAM remains the default for old callers.
+     * @return Complete event or atomic shape, fixed-binding, work or storage failure.
+     */
     [[nodiscard]] std::expected<LiveEvent, LiveError> stream(std::span<const LocalStreamRow> rows, LiveWork &work,
-                                                             bool compact = false) const;
+                                                             bool compact = false,
+                                                             LiveDataMessage type = LiveDataMessage::STREAM_DATA) const;
 
     /** Own one local TICKER record and optional explicit event-time metadata. */
     [[nodiscard]] std::expected<LiveEvent, LiveError>

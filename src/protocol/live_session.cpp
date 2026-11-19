@@ -1075,8 +1075,10 @@ void chargeData(StreamDataLimits limits, std::size_t descriptions, std::size_t p
 } // namespace
 
 struct LiveSnapshot::State {
-    OwnerLedger ledger;         ///< Destroyed after all allocator-aware members and backing.
-    LiveArena arena;            ///< Complete requested backing, including abandoned container growth.
+    OwnerLedger ledger; ///< Destroyed after all allocator-aware members and backing.
+    LiveArena arena;    ///< Complete requested backing, including abandoned container growth.
+    std::optional<TemporaryReservation> fixedMetadataReservation;
+    std::shared_ptr<const core::detail::RecordBlockBinding> fixedMetadata;
     std::size_t references = 1; ///< Serialized intrusive handle count.
     std::uint64_t generation;   ///< Non-reused effective peer generation.
     Protocol protocol;          ///< Complete effective descriptor, without authorization secrets.
@@ -1556,7 +1558,9 @@ detail::LocalEventOwner::LocalEventOwner(LiveSnapshot epoch, std::size_t eventBy
     : epoch_(std::move(epoch)), eventBytes_(eventBytes) {
 }
 
-std::expected<detail::LocalEventOwner, LiveError> detail::LocalEventOwner::create(LiveLimits limits, LiveWork &work) {
+std::expected<detail::LocalEventOwner, LiveError>
+detail::LocalEventOwner::create(LiveLimits limits, LiveWork &work,
+                                std::shared_ptr<const core::detail::RecordBlockBinding> binding) {
     try {
         debit(1, work.operations);
         debit(sizeof(Storage) + sizeof(LiveSnapshot::State), work.bytes);
@@ -1570,6 +1574,12 @@ std::expected<detail::LocalEventOwner, LiveError> detail::LocalEventOwner::creat
         std::unique_ptr<Storage, decltype(release)> storage(new Storage(limits.residentBytes, 0, limits.owners),
                                                             release);
         auto snapshot = makeOwner<LiveSnapshot::State>(*storage, 0, core::LocalProfile::BINARY_FIELDS_V1, 0);
+
+        if (binding) {
+            debit(binding->retainedCapacityBytes(), work.bytes);
+            snapshot->fixedMetadataReservation.emplace(*storage, binding->retainedCapacityBytes());
+            snapshot->fixedMetadata = std::move(binding);
+        }
 
         return LocalEventOwner(LiveSnapshot(snapshot.release()), limits.eventBytes);
     } catch (Error error) {
@@ -1650,7 +1660,8 @@ void detail::LocalEventOwner::appendRecord(LiveEvent::State &event, std::int32_t
 }
 
 std::expected<LiveEvent, LiveError> detail::LocalEventOwner::stream(std::span<const LocalStreamRow> rows,
-                                                                    LiveWork &work, bool compact) const {
+                                                                    LiveWork &work, bool compact,
+                                                                    LiveDataMessage type) const {
     if (rows.empty())
         return std::unexpected(Error::INVALID_CONFIGURATION);
 
@@ -1666,8 +1677,17 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::stream(std::span<co
                 fields = sum(fields, row.fields.size());
 
                 if (row.shared) {
-                    if (row.fields.data() != row.shared->fields().data() ||
-                        row.fields.size() != row.shared->fields().size() || row.symbol != row.shared->symbol())
+                    if (row.shared->fixedOwnerIdentity() &&
+                        (!epoch_.state_->fixedMetadata ||
+                         epoch_.state_->fixedMetadata.get() != row.shared->fixedOwnerIdentity() ||
+                         epoch_.state_->fixedMetadata->retainedCapacityBytes() != row.shared->fixedOwnerBytes() ||
+                         epoch_.state_->fixedMetadata->schema.recordId(row.context) != std::optional{row.localId})) {
+                        throw Error::INVALID_CONFIGURATION;
+                    }
+
+                    if ((!row.removalTime && (row.fields.data() != row.shared->fields().data() ||
+                                              row.fields.size() != row.shared->fields().size())) ||
+                        row.symbol != row.shared->symbol())
                         throw Error::INVALID_CONFIGURATION;
 
                     if (previousBatch != row.shared->batchIdentity()) {
@@ -1705,7 +1725,7 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::stream(std::span<co
             debit(units, work.textUnits);
             auto event =
                 makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), bytes, epoch_, LiveEventKind::DATA);
-            event->messageType = STREAM_DATA;
+            event->messageType = std::to_underlying(type);
             event->fields.reserve(fields);
             event->records.reserve(rows.size());
 
@@ -1760,10 +1780,10 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::stream(std::span<co
                                           row.context,
                                           row.shared ? row.symbol : copyText(row.symbol),
                                           cipher ? cipher->cipher : 0,
-                                          0,
+                                          row.flags,
                                           {},
                                           std::span(event->fields).subspan(start, row.fields.size()),
-                                          {},
+                                          row.removalTime,
                                           {}});
             }
 
@@ -1774,13 +1794,14 @@ std::expected<LiveEvent, LiveError> detail::LocalEventOwner::stream(std::span<co
         debit(sum(sizeof(LiveEvent::State), bytes), work.bytes);
         auto event =
             makeOwner<LiveEvent::State>(*epoch_.state_->ledger.lease.get(), bytes, epoch_, LiveEventKind::DATA);
-        event->messageType = STREAM_DATA;
+        event->messageType = std::to_underlying(type);
         event->decoded.records.reserve(rows.size());
 
         for (const auto &row : rows) {
             debit(row.fields.size() + 1, work.visits);
             debit(row.symbol.size(), work.textUnits);
-            appendRecord(*event, row.localId, row.context, row.symbol, row.fields, 0, {}, {}, work);
+            appendRecord(*event, row.localId, row.context, row.symbol, row.fields, row.flags, row.removalTime, {},
+                         work);
         }
 
         event->complete(work);
