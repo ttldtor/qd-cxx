@@ -1120,3 +1120,5 @@ Set `EndpointOptions::aggregationPeriod` or the `dxfeed.aggregationPeriod` confi
 A TICKER subscription retains waiting updates in its collector so repeated values of one key may conflate. STREAM and HISTORY use bounded ordered queues and can report their existing overflow outcome. During a running interval, TICKER initial collector values remain eligible ahead of pending live updates. Already detached queue entries retain their original order. Closing drains admitted events without waiting for the local interval. Zero preserves immediate delivery.
 
 Use `createSubscription<events::NuamOrder>()` on a HISTORY endpoint for indexed Nuam order updates. See [NuamOrder receiving](../spec/events/NUAM-ORDER.md).
+
+[Threads, waits and object lifetime](API-THREADS.md): per-operation rules for methods, callbacks and request handles.
