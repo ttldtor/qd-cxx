@@ -2,6 +2,8 @@
 
 [English version](STREAM-COLLECTOR.md). Английская версия нормативная.
 
+[Общие инварианты коллекторов](COLLECTOR-INVARIANTS.ru.md) связывают семантику семейства с допуском, ошибками и владением.
+
 Подключите `qd/collectors/stream.hpp` и свяжите `qdcxx_collectors`. Чистый C++23
 компонент по умолчанию ставит точные STREAM interests в очередь поверх [desired state](STATE.ru.md)
 и целиком принятых [событий live-сессии](LIVE-SESSION.ru.md). Каждая запись сохраняет
