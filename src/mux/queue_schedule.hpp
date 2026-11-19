@@ -5,6 +5,7 @@
 #include "qd/mux/queue.hpp"
 
 namespace org::ttldtor::qdcxx::mux::detail {
+struct PublisherStreamConsumer;
 /** Number of fair visits to each configured client slot before source admission can reopen. */
 inline constexpr std::size_t QUEUE_PHASES = 5;
 
@@ -20,6 +21,12 @@ struct QueueScheduleClient {
  * Detached lease release may run concurrently; its record reservations remain atomic.
  */
 struct QueueScheduleAccess {
+    /** Open the publisher's STREAM callback using the ordinary client limits and registration transaction.
+     * @return A handle with compact delivery enabled, or the original open diagnostic.
+     */
+    static std::expected<MuxHandle, QueueFailure>
+    openPublisherStream(MuxQueue &queue, ClientLimits limits, const std::shared_ptr<PublisherStreamConsumer> &consumer,
+                        QueueWork &work);
     /** Reserve one immutable publisher binding in the detached context before opening clients.
      * @param queue Serialized queue with no active/retained generations or pending input.
      * @param binding Exact pure metadata owner, retained by every detached context lease.

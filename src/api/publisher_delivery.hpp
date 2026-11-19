@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "../mux/publisher_stream_batch.hpp"
 #include "qd/api/publisher.hpp"
 #include "qd/events/event_flags.hpp"
 #include "qd/mux/queue.hpp"
 #include "qd/protocol/live_session.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bitset>
 
@@ -29,26 +31,102 @@ inline constexpr std::array DATA_MESSAGES{protocol::LiveDataMessage::TICKER_DATA
 using DeliveryMask = std::bitset<MAX_STREAM_WINDOW_ROWS>;
 
 /** The worker retains one detached callback batch until every eligible row has completed writing. */
-struct Delivery final : mux::MuxConsumer {
-    mux::OwnedMuxBatch batch; ///< Detached owner, independent of the completed callback.
-    std::size_t cursor = 0;   ///< First row not fully written or suppressed.
-    DeliveryMask suppressed;  ///< Committed policy revocations within this batch.
+struct Delivery final : mux::detail::PublisherStreamConsumer {
+    mux::OwnedMuxBatch batch;                    ///< Detached owner, independent of the completed callback.
+    mux::detail::PublisherStreamBatch stream;    ///< Alternative compact owner for eligible STREAM callbacks.
+    std::size_t rangeIndex = 0, rangeOffset = 0; ///< Position corresponding to cursor in a compact batch.
+    std::size_t cursor = 0;                      ///< First row not fully written or suppressed.
+    DeliveryMask suppressed;                     ///< Committed policy revocations within this batch.
 
     /** Retain the callback batch and pause further delivery until the worker releases it.
      * @param view Borrowed callback rows, retained before return.
      * @return PAUSE until the worker requests resume.
      */
     mux::BatchAction onBatch(const mux::BorrowedMuxBatch &view) override {
+        clear();
         batch = view.retain();
-        cursor = 0;
-        suppressed.reset();
 
         return mux::BatchAction::PAUSE;
+    }
+
+    mux::BatchAction onStreamRanges(mux::detail::PublisherStreamBatch selected) override {
+        clear();
+        stream = std::move(selected);
+
+        return mux::BatchAction::PAUSE;
+    }
+
+    /** @return All rows in the held callback, including completed and suppressed positions. */
+    [[nodiscard]] std::size_t size() const noexcept {
+        return stream.size() ? stream.size() : batch.records().size();
+    }
+
+    /** Advance after a complete frame or a suppressed prefix; retain the entire callback owner. */
+    void advanceTo(std::size_t end) noexcept {
+        if (stream.size()) {
+            for (auto left = end - cursor; left;) {
+                const auto count = stream.range(rangeIndex).rows.size();
+                const auto moved = std::min(left, count - rangeOffset);
+                left -= moved;
+                rangeOffset += moved;
+
+                if (rangeOffset == count) {
+                    ++rangeIndex;
+                    rangeOffset = 0;
+                }
+            }
+        }
+
+        cursor = end;
+    }
+
+    /** Visit unsuppressed rows from the current position without committing a cursor move.
+     * @param visit Receives the absolute position and a borrowed row; false ends this scan.
+     */
+    template <class Visit> void visitPending(Visit &&visit) const {
+        if (!stream.size()) {
+            const auto records = batch.records();
+
+            for (auto i = cursor; i < records.size(); ++i) {
+                if (!suppressed[i] && !visit(i, records[i]))
+                    break;
+            }
+
+            return;
+        }
+
+        struct Row {
+            const core::RecordContext &context;
+            std::u16string_view symbol;
+            std::span<const core::FieldValueView> typedValues;
+            std::int32_t eventFlags;
+            std::optional<std::int64_t> rawTime;
+        };
+
+        auto i = cursor;
+        auto offset = rangeOffset;
+
+        for (auto index = rangeIndex; i < stream.size(); ++index) {
+            const auto range = stream.range(index);
+
+            for (const auto &row : range.rows.subspan(offset)) {
+                if (!suppressed[i] && !visit(i, Row{range.common.context, row.payload->symbol(), row.payload->fields(),
+                                                    row.source.flags, range.common.rawTime}))
+                    return;
+
+                ++i;
+            }
+
+            offset = 0;
+        }
     }
 
     /** Release retained rows and reset the cursor and revocation mask. */
     void clear() noexcept {
         batch = {};
+        stream = {};
+        rangeIndex = 0;
+        rangeOffset = 0;
         cursor = 0;
         suppressed.reset();
     }
@@ -76,17 +154,17 @@ inline bool publisherRecordAllowed(const std::optional<FeedFilter> &policy, cons
  * @param delivery Retained batch with the current cursor and already suppressed row mask.
  * @param policy Proposed immutable replacement filter for this family.
  * @param schema Publisher schema whose provenance identifies the held contexts.
- * @param revoked Initially empty candidate mask; discarded by the caller on any failure.
+ * @param revoked Destination mask for additional revoked rows, including a staged policy candidate.
  * @throws Error for the existing filter query failures, before queue or policy commit.
  */
 inline void collectDeliveryRevocations(const Delivery &delivery, const std::optional<FeedFilter> &policy,
                                        const core::LocalSchema &schema, DeliveryMask &revoked) {
-    const auto held = delivery.batch.records();
+    delivery.visitPending([&](std::size_t index, const auto &row) {
+        if (!publisherRecordAllowed(policy, schema, row.context, row.symbol))
+            revoked.set(index);
 
-    for (auto row = delivery.cursor; row < held.size(); ++row) {
-        if (!delivery.suppressed[row] && !publisherRecordAllowed(policy, schema, held[row].context, held[row].symbol))
-            revoked.set(row);
-    }
+        return true;
+    });
 }
 
 /** Front-loaded control output does not consume DATA queue reservations during negotiation. */
@@ -121,26 +199,29 @@ inline std::expected<protocol::LivePendingOutput, protocol::LiveError>
 composeDelivery(Delivery &delivery, DeliveryOutputView outputState, protocol::LiveSession &session, std::size_t family,
                 const core::LocalSchema &schema, const std::optional<PublisherStreamByteLimits> &streamBytes,
                 std::span<protocol::LiveDataRecordView> outgoing, protocol::LiveWork &work) {
-    const auto records = delivery.batch.records();
     std::size_t count = 0;
-
-    for (auto i = delivery.cursor; i < records.size(); ++i) {
-        if (delivery.suppressed[i])
-            continue;
-
+    bool valid = true;
+    delivery.visitPending([&](std::size_t, const auto &record) {
         if (count == outgoing.size())
-            break;
+            return false;
 
-        const auto &record = records[i];
         const auto id = schema.recordId(record.context);
 
-        if (!id)
-            return std::unexpected(protocol::LiveError::INVALID_CONFIGURATION);
+        if (!id) {
+            valid = false;
+
+            return false;
+        }
 
         const bool removed = (record.eventFlags & events::indexed_event_flags::REMOVE_EVENT) != 0;
         outgoing[count++] = {*id, record.symbol, removed ? std::span<const core::FieldValueView>{} : record.typedValues,
                              record.eventFlags, removed ? record.rawTime : std::nullopt};
-    }
+
+        return true;
+    });
+
+    if (!valid)
+        return std::unexpected(protocol::LiveError::INVALID_CONFIGURATION);
 
     const auto rememberRows = [&](std::size_t written) {
         outputState.recordCount = written;
@@ -211,12 +292,15 @@ inline bool revokesOutput(DeliveryOutputView outputState, const Delivery &delive
  * @param handle Registration to resume once its retained batch empties.
  */
 inline void releaseSuppressedPrefix(Delivery &delivery, mux::MuxHandle &handle) noexcept {
-    const auto records = delivery.batch.records();
+    const auto size = delivery.size();
+    auto next = delivery.cursor;
 
-    while (delivery.cursor < records.size() && delivery.suppressed[delivery.cursor])
-        ++delivery.cursor;
+    while (next < size && delivery.suppressed[next])
+        ++next;
 
-    if (!records.empty() && delivery.cursor == records.size()) {
+    delivery.advanceTo(next);
+
+    if (size && delivery.cursor == size) {
         delivery.clear();
         (void)handle.requestResume();
     }
