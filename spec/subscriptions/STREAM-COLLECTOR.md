@@ -2,6 +2,8 @@
 
 [Русская версия](STREAM-COLLECTOR.ru.md). English is authoritative.
 
+[Common collector invariants](COLLECTOR-INVARIANTS.md) relate this family to admission, failure and ownership boundaries.
+
 Include `qd/collectors/stream.hpp` and link `qdcxx_collectors`. This pure C++23
 component defaults to exact STREAM interests over [desired state](STATE.md) and whole
 admitted [live-session events](LIVE-SESSION.md). It implements every-record order,

@@ -2,6 +2,8 @@
 
 [Русская версия](TICKER-COLLECTOR.ru.md). English is authoritative.
 
+[Common collector invariants](COLLECTOR-INVARIANTS.md) relate this family to admission, failure and ownership boundaries.
+
 Include `qd/collectors/ticker.hpp` and link `qdcxx_collectors`. The pure C++23
 collector keeps one latest value per exact record/symbol key and independent,
 finite local delivery views. It consumes whole admitted
