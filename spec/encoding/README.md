@@ -6,6 +6,9 @@ This area will describe primitive and stateful encodings used by schema and QTP,
 
 Encoding rules must be backed by upstream source/test evidence and representative fixtures. Do not assume a codec is stateless merely because its public entry point looks functional.
 
+See the [field identity contract map](FIELD-TYPES.md#field-identity-contract-map) for exact full IDs,
+physical wire values, Java storage, null/range rules, unsupported cases and existing oracle evidence.
+
 ## QDCXX-004 dependency inventory
 
 Descriptive **S** (source) / **D** (documentation) observations for Java QD 3.355, commit `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`; **U** denotes unresolved coverage. This is not a full primitive-encoding specification. Immutable links are in [QTP source inventory](../protocol/SOURCES.md#encoding-and-core).

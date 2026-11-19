@@ -41,6 +41,8 @@ struct PmrCharArrayResult {
 };
 
 /** Read a compact character count and exact BMP UTFChar units without retaining input.
+ * Full field identity 10 uses this unit-counted grammar; identity 137 uses UTFString byte counts.
+ * See spec/encoding/FIELD-TYPES.md for exact identity and null/range rules.
  * Null is distinct from empty. Surrogates and observed overlong BMP encodings are preserved;
  * supplementary scalar encodings are rejected after their complete tail. This is not UTFString.
  * Length/domain checks precede unit admission; allocation failures are translated to a result.

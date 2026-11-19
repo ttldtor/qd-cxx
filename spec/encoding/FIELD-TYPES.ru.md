@@ -9,6 +9,94 @@ FileWriter/FileReader закреплённого Java. Расширение дв
 диагностические входы и проверки воспроизводимости. Lock неизменён. Это поддержка полей,
 не адаптер события Profile и не доказательство полной совместимости частного tape.
 
+## Карта контрактов идентичностей полей
+
+Карта охватывает все именованные C++ `SerialFieldType` из
+[`serial_field_type.hpp`](../../include/qd/core/serial_field_type.hpp). Каждая строка задаёт точную
+полную идентичность. Допуск чтения по-прежнему требует выбранного локального профиля; у писателя,
+инспектора и адаптера событий свои контракты допуска. `I32` означает INT32_MIN..INT32_MAX, `I64` —
+INT64_MIN..INT64_MAX. Compact-чтение потребляет всю кодировку compact long до знаковой проекции
+младших 32 бит. У скаляра нет nullable payload; исходный ноль по умолчанию является значением,
+даже если отдельный decimal/event accessor трактует эти биты как NaN или отсутствие бизнес-данных.
+
+Ниже перечислены локальные Java-поля, использованные существующим oracle. Обычное int-поле занимает
+один Java int slot. `LongField`, `WideDecimalField` и `TimeMillisField` занимают два физических int slot
+с хвостом VOID: high32 занимают первый slot, low32 — хвостовой; каждый даёт одно логическое значение C++.
+Object-поля имеют независимый индекс
+object slot. У BYTE/SHORT нет стандартной Java-фабрики поля; используется явно обозначенный
+consumer типа8. Явный wire VOID и физический хвост хранения — разные случаи.
+
+| Полная идентичность (base + representation) | Физическое wire-значение | Локальное Java-поле / значение C++ | Null и диапазон | Доказательство и неподдержанный случай |
+| --- | --- | --- | --- | --- |
+| 0 `VOID_FIELD` (0 + 0x00) | Нет байтов | Slot `VoidIntField` остаётся нулевым; `raw=0` | Нет null; только ноль | S; Java исключает действия VOID; нет доставленного логического поля или синтетического хвоста |
+| 1 `BYTE` (1 + 0x00) | Знаковый байт | Consumer `CompactIntField` 8; `raw` со знаковым расширением | Нет null; -128..127 | S; стандартная Java-фабрика BYTE возвращает null |
+| 2 `UTF_CHAR` (2 + 0x00) | Один UTFChar, 1..4 байта | `CompactCharField`; кодовая точка в `raw` | Нет null; 0..0x10ffff, включая суррогаты | Q; неверные lead/tail/range отвергаются; общее значение не усекается до char16 |
+| 3 `SHORT` (3 + 0x00) | Знаковые big-endian 16 бит | Consumer `CompactIntField` 8; `raw` со знаковым расширением | Нет null; -32768..32767 | S; стандартная Java-фабрика SHORT возвращает null |
+| 4 `INT` (4 + 0x00) | Знаковые big-endian 32 бита | `PlainIntField`; `raw` со знаковым расширением | Нет null; I32 | S; неполное значение фиксированной ширины завершается ошибкой |
+| 8 `COMPACT_INT` (8 + 0x00) | Compact long, знаковые low32 | `CompactIntField`; `raw` со знаковым расширением | Нет null; I32 | E; допустимые широкие кодировки проецируются в low32; high32 не сохраняются |
+| 9 `BYTE_ARRAY` (9 + 0x00) | Compact LONG числа байтов, затем байты | `ByteArrayField`; `bytes`, `raw=0` | -1 null; 0 empty; count <= INT32_MAX | O; нет интерпретации UTF или объектов |
+| 10 `UTF_CHAR_ARRAY` (10 + 0x00) | Compact LONG числа units, затем BMP UTFChar | `StringField(false)`; `units`, `raw=0` | -1 null; 0 empty; count <= INT32_MAX | E; supplementary scalar отвергается; точные surrogate units сохраняются |
+| 24 `DECIMAL` (8 + 0x10) | Compact long, знаковые low32 | `DecimalField`; точные исходные decimal bits | Нет null; I32 | S; общее поле не преобразует в double и не проверяет бизнес-диапазон |
+| 40 `SHORT_STRING` (8 + 0x20) | Compact long, знаковые low32 | `ShortStringField`; упакованные биты в `raw` | Нет null; I32 | E; нет общего преобразования в текст или проверки текста |
+| 56 `TIME_SECONDS` (8 + 0x30) | Compact long, знаковые low32 | `TimeSecondsField`; исходные секунды | Нет null; I32 | Q; нет общего перевода в миллисекунды или event-time metadata |
+| 72 `SEQUENCE` (8 + 0x40) | Compact long, знаковые low32 | `SequenceField`; упакованные биты в `raw` | Нет null; I32 | E; нет общей распаковки; независимо от heartbeat sequence |
+| 88 `DATE` (8 + 0x50) | Compact long, знаковые low32 | `DateField`; исходный идентификатор дня | Нет null; I32 | E; нет календарной проверки или преобразования даты |
+| 104 `LONG` (8 + 0x60) | Compact long, все знаковые64 | `LongField`; точный `raw` | Нет null; I64 | S; нет логического хвоста VOID или сужения до low32 |
+| 120 `WIDE_DECIMAL` (8 + 0x70) | Compact long, все знаковые64 | `WideDecimalField`; точные исходные decimal bits | Нет null; I64 | Q; общее хранение сохраняет неканонические/специальные биты; преобразование отдельно |
+| 137 `STRING` (9 + 0x80) | Compact LONG числа байтов, затем тело UTFString | `StringField(true)`; `units`, `raw=0` | -1 null; 0 empty; byte count <= 4*INT32_MAX | O; точный UTF-16; число байтов не является числом units типа10; неверный UTF даёт ошибку |
+| 152 `TIME_MILLIS` (8 + 0x90) | Compact long, все знаковые64 | `TimeMillisField`; исходные миллисекунды | Нет null; I64 | S; нет общего event-time преобразования или nanosecond identity |
+| 233 `CUSTOM_OBJECT` (9 + 0xe0) | Compact LONG числа байтов, затем непрозрачные байты | Oracle использует локальный `ByteArrayField` 9; `bytes`, `raw=0` | -1 null; 0 empty; count <= INT32_MAX | O; requested composer доказывает wire233; FileWriter выдаёт local9; custom object не исполняется |
+| 249 `SERIAL_OBJECT` (9 + 0xf0) | Compact INT числа байтов (знаковые low32), затем непрозрачные байты | `MarshalledObjField.getBytes`; `bytes`, `raw=0` | -1 null; 0 empty; projected count <= INT32_MAX | O; нет десериализации/загрузки классов; неизвестный Java skip использует другую грамматику |
+
+Все nullable-диапазоны count начинаются с -1; меньшие значения дают ошибку. Null и empty — разные
+владеющие значения. Wire-максимум не разрешает выделение памяти: конечные бюджеты одного значения,
+накопленной работы и владения ниже могут отвергнуть корректный count. UTFString также ограничивает
+число декодированных UTF-16 units. У скаляров отсутствуют оба payload; у 10/137 отсутствует `bytes`,
+у 9/233/249 — `units`. Созданные вручную значения с неверным диапазоном raw, ненулевым payload raw
+или несовместимым payload member не проходят `validFieldValue`/`validFieldValueView`. Views заимствуют
+payload storage и требуют правил [владения записью](../schema/RECORD-OWNERSHIP.ru.md); владеющее
+представление не сохраняет хранилище входа, схемы или Java callback.
+
+### Ключи доказательств и границы версий
+
+- **E:** закреплённый QD 3.355: [примитивы полей](../../tests/fixtures/encoding/field-types/expected/primitives.tsv),
+  [физическая/локальная схема](../../tests/fixtures/encoding/field-types/expected/schema.tsv) и
+  [покрытие](../../tests/fixtures/encoding/field-types/COVERAGE.ru.md). Широкие записи 40/72/88 сохраняют
+  проекцию и выравнивание sentinel отдельно от наблюдений примитивов.
+- **Q:** закреплённый QD 3.355: [примитивы и production-покрытие Quote](../../tests/fixtures/protocol/quote/COVERAGE.ru.md)
+  и [контракт точных значений](QUOTE-VALUES.ru.md), включая UTFChar и все знаковые64 wide-decimal bits.
+- **S:** QD 3.355 и 3.356: [scalar samples](../../tests/fixtures/encoding/field-types/expected/scalars/samples.tsv),
+  [manifest](../../tests/fixtures/encoding/field-types/scalar-captures.json) и
+  [проверка](../../tests/conformance/protocol/field-types/SCALAR-VALIDATION.ru.md). Requested composer
+  и parser для BYTE/SHORT отделены от записей FileWriter; VOID имеет собственные ограничения доказательства.
+- **O:** QD 3.355 и 3.356: [object samples](../../tests/fixtures/encoding/field-types/expected/objects/samples.tsv),
+  [manifest](../../tests/fixtures/encoding/field-types/object-captures.json) и
+  [проверка](../../tests/conformance/protocol/field-types/OBJECT-VALIDATION.ru.md). Наблюдения известных
+  consumers137/249 выбирают грамматику UTFString/projected INT; C++ намеренно сохраняет её при skip.
+
+Ключи обозначают существующие записанные доказательства; это не новый захват и не утверждение, что
+каждое наблюдение примитива было callback FileReader. [upstream.lock](../../upstream.lock) остаётся
+QD 3.355 на `0ddc0a09779fb61d74cc0b37c6449ff47dcb715f`; второй pin S/O — QD 3.356 на
+`f71e4cb390d1586f2d4e3a83d9b9067e3326ef19`. Измерения других версий не подтверждают эти строки.
+Первичные исходники задают [идентичности и фабрики](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/SerialFieldType.java)
+и [production dispatch чтения/хранения](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/qtp/BinaryRecordDesc.java);
+[хранение long в RecordCursor](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/qd-core/src/main/java/com/devexperts/qd/ng/RecordCursor.java#L1331-L1342)
+задаёт физический порядок high32/low32.
+
+### Идентичности за пределами карты
+
+Устаревшее Java-имя `TIME` обозначает существующий full56 `TIME_SECONDS`; новой wire-идентичности нет.
+Java full168 `TIME_NANOS` (8 + 0xa0) зарезервирован. В карте у него нет поддержанного C++ enumerator,
+контракта значения, обещания null/range или допуска field oracle; C++ отвергает его и при base8.
+Зарезервированные base IDs5/6/7/11..15, неименованные сочетания selectors, отрицательные IDs и неизвестные
+старшие биты также не проходят точный допуск профиля. Java factory fallback или совпадение masked
+serialization bits не разрешают идентичность C++. Helpers композиции/декомпозиции эти случаи не проверяют.
+
+Карта сохраняет wire-представление и общие значения. [Преобразования полей событий по схеме](../events/FIELD-CONVERSIONS.ru.md),
+Java wire-to-local conversion/recovery, object access и выбор producer остаются отдельными контрактами;
+они не следуют из общей базы или имени локального поля. Существующих fixtures достаточно для этой
+справочной карты; они остаются неизменными.
+
 ## Явный профиль двоичных полей
 
 `LocalProfile::BINARY_FIELDS_V1` — явно выбранное обычное подмножество
