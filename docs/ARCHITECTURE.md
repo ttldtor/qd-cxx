@@ -5,11 +5,13 @@
 ## Clarified goal: library and operational programs
 
 The project includes equivalents of the necessary qds-tools utilities, not just a library/inspector.
-QDCXX-020 establishes the actual inventory and order. Feeds, multiplexing, recording/replay and
+The [utility inventory](upstream/QDS-TOOLS.md) records the upstream commands and dependencies.
+Feeds, multiplexing, recording/replay and
 diagnostics are use categories, not preapproved command names. Shared data/subscription behavior
 belongs in libraries; transport handles connections; programs compose components, configuration,
 management and observability. Do not turn the inspector into a universal server or duplicate shared
-logic. Transport/threading and CLI/properties compatibility remain separate decisions.
+logic. The selected runtime and current ownership contracts are described below;
+CLI/properties compatibility is defined per utility.
 [Roadmap and migration policies](NEXT-STEPS.md).
 
 ## Intent
@@ -23,15 +25,16 @@ it does not add a C++ loader, ambient process settings or transport to core/even
 
 `qd-cxx` will reproduce the externally observable contracts of Java QD without mechanically reproducing its class hierarchy or historical implementation choices. The design target is a modular, testable C++23 system.
 
-## Proposed boundaries
+## Component boundaries
 
-These are direction-setting boundaries, not yet implementation commitments:
+These logical boundaries guide the implementation. [Current capabilities](CURRENT-STATE.md)
+identify the implemented profiles and their remaining limits:
 
-- **qd-core**: records, field values, scheme semantics, symbols, subscriptions, and core state transitions. It must not depend on transport.
-- **schema/model**: proposed immutable resolved records, fields, complete type identities, names/lookups and a Java slot projection; source operations and mapping/provider information are retained as provenance, not executable Java mappings.
+- **qdcxx_core**: records, field values, scheme semantics, symbols, subscriptions, and core state transitions. It must not depend on transport.
+- **schema/model**: immutable resolved records, fields, complete type identities, names/lookups and a Java slot projection; source operations and mapping/provider information are retained as provenance, not executable Java mappings.
 - **encoding**: byte-level primitives and stateful codecs with explicit error and ownership rules.
 - **protocol**: QTP messages, framing, negotiation, and protocol state machines expressed independently of a socket library.
-- **transport adapters**: connections, I/O scheduling, backpressure, lifecycle, and integration with a future networking runtime.
+- **transport adapters**: connections, I/O scheduling, backpressure, lifecycle, and integration with the optional networking runtime.
 - **tools**: importers, inspectors, fixture capture, and compatibility diagnostics.
 
 Dependency direction should point inward: transport may depend on protocol; protocol may depend on encoding and core contracts; core must not depend on transport.
@@ -39,19 +42,25 @@ Dependency direction should point inward: transport may depend on protocol; prot
 ## Configurable schemas and event mappings
 
 [ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.md) makes runtime-resolved schemas a project-wide requirement.
-Built-in defaults and future XML/JSON or programmatic sources use the same validated local-schema boundary.
+Built-in defaults, programmatic construction and the optional [native JSON loader](../spec/schema/NATIVE-JSON.md)
+use the validated local-schema boundary. The [offline Java bridge](../tools/schema-export/README.md)
+resolves its supported XML/configuration inputs before C++ loads the exported schema. Native XML
+construction and general Java-property resolution remain separate work.
 Generic records remain available without standard event adapters; Quote/Profile mappings bind to a particular schema instead of assuming its default field order.
 Source configuration, wire adaptation and event projection remain separate responsibilities.
-QDCXX-025 implements the first bounded application of this decision; the decision is not a claim of existing loader or arbitrary-schema support.
+QDCXX-025 implemented the first bounded mapping contract. Later loaders and mappings retain their
+own explicit schema/type limits; ADR-0003 does not imply arbitrary-schema support.
 The [configuration requirements](CONFIGURATION.md) apply beyond schema settings: property sources, precedence, scope, read timing and diagnostics are explicit compatibility concerns.
 
 ## Live subscription ownership
 
-[ADR-0005](decisions/ADR-0005-live-subscriptions.md) selects the design for upcoming live subscriptions;
+[ADR-0005](decisions/ADR-0005-live-subscriptions.md) establishes the ownership design for live subscriptions;
 the [subscription contracts](../spec/subscriptions/CONTRACTS.md) define its observable barriers and budgets.
 `qdcxx_core` owns deterministic identities, desired-interest maps and bounded atomic mutations.
 Live session/client/runtime layers own connection epochs, queues, callbacks, I/O and lifecycle.
-One logical serialization domain is selected for client dispatch.
+The local dispatcher has one logical serialization domain. The current typed Feed runtime owns a
+shared worker for its endpoints; its callback and shutdown rules are defined in the
+[Feed guide](FEED-API.md#runtime-callbacks-and-shutdown).
 The [pure protocol session](../spec/subscriptions/LIVE-SESSION.md) owns a fresh epoch,
 immutable peer generations and whole admitted frames. Caller-supplied byte spans and work credits
 keep that layer independent of runtime, clocks and application callbacks. Its partial-write cursor
@@ -76,8 +85,34 @@ The [optional TCP adapter](../spec/transport/TCP-RUNTIME.md) implements only the
 credential-free plain subset, with explicit bootstrap, bounded SDK sources and owned-operation
 retirement. The [controlled STREAM tool/example](SUBSCRIPTIONS.md) connects this actual runtime
 to the dispatcher with explicit add/remove output and separate local/transport terminal evidence.
-TLS and the complete subscription client remain separate work.
-The ADR does not imply implementation or owner acceptance of those remaining parts.
+The separate [TLS runtime](../spec/transport/TLS-RUNTIME.md) and [typed Feed API](FEED-API.md)
+implement their documented receiving profiles, including verified TLS and optional Basic authorization.
+The plain TCP adapter retains its own narrower contract. The [receiving qualification](../tests/conformance/subscriptions/DELIVERY-VALIDATION.md)
+records the composed checks; neither the ADR nor component checks establish full QD compatibility or release.
+
+## Accepted direction for further implementation
+
+The next architecture extends the shared record path across receiving, processing and publication.
+A schema-based `RecordFeed` and the typed `Feed` share an `Endpoint`; immutable owning record blocks
+preserve all fields, schema identity and source generation. Prepared bindings support event projection.
+Callbacks borrow views; explicit retention and copying have separate ownership and capacity charges.
+These are accepted requirements for further implementation, beyond the current [Feed profiles](FEED-API.md).
+
+Logical channels will separate schema, routes, permitted data/subscription families and lifecycle within
+an endpoint. Bidirectional exchange and publisher support require independent send/receive readiness
+and authorization. Source identity, ingress generation and qualified route provenance remain explicit;
+merging independent inputs does not establish a global source order.
+
+Input, collector state, consumer queues, retained data and output require separate configurable byte
+budgets with coordinated reservations. Handoff size is independent of input capacity and QTP frame size;
+ready data proceeds without waiting to fill a batch. Each mutable processing partition has one execution
+owner. Notifications for one logical subscription remain serial and non-reentrant, while independent
+subscriptions may execute concurrently through a shared executor outside the network owner and internal
+locks. This direction does not change the current shared-worker contract described above.
+
+Implementation must establish observable ordering, completion, failure and resource behavior, then
+measure comparable receiving/processing/publication paths against Java QD. An accepted design does not
+establish implementation, measured performance or release. See the [roadmap](NEXT-STEPS.md).
 
 ## Design principles
 
@@ -92,8 +127,8 @@ The ADR does not imply implementation or owner acceptance of those remaining par
 
 A package manager, stable public API and general binary compatibility policy remain undecided. The selected optional networking profile and serialized ownership model are described above and in ADR-0006. The QDCXX-010 owner follow-up selects doctest as a test-only FetchContent dependency. Further decisions require scoped tasks and evidence.
 
-QDCXX-010 implements only the encoding boundary's compact int/long primitives, with a provisional span-based API, minimal CMake/CTest and no third-party runtime dependency. See [build/API](CPP-BUILD.md) and [validation](../tests/conformance/encoding/VALIDATION.md). This does not implement or change the other proposed boundaries.
+The original QDCXX-010 increment implemented only the encoding boundary's compact int/long primitives, with a provisional span-based API, minimal CMake/CTest and no third-party runtime dependency. See [build/API](CPP-BUILD.md) and [validation](../tests/conformance/encoding/VALIDATION.md). Its validation record retains that original scope.
 
 ## Accepted ADR-0001 boundaries
 
-Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON is accepted for schema-description interchange; libraries, canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.
+Accepted by the project owner on 2026-09-21. The three boundaries are logical ownership boundaries; they do not require three file formats or three serialization subsystems. Core can consume a resolved local schema without loading XML or its history. Preserve copied-main-alias behavior only for XML import under the pinned QD 3.355 profile; it is not a requirement for future native C++ schema construction. Retain Java slot projection without prescribing C++ storage. Approve structured unsupported-local-type diagnostics for BYTE/SHORT while retaining local-construction rejection; this does not ban their wire codes. Keep original requests and selected layouts separate. JSON was accepted for schema-description interchange. The later native JSON profile selects its private pinned loader dependency; canonical hashes and whole-session serialization remain undecided. Existing oracle evidence is unchanged.

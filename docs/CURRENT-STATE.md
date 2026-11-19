@@ -5,6 +5,12 @@
 The project implements selected bounded profiles against Java QD 3.355 at the revision in
 [upstream.lock](../upstream.lock). Full QD, dxFeed, QTP or tape compatibility is not claimed.
 
+This page describes implemented profiles. The [accepted architectural direction](ARCHITECTURE.md#accepted-direction-for-further-implementation)
+for RecordFeed, channels, publication and a shared SDK executor for the unified record path requires further implementation.
+The existing [custom event executor policy](CALLBACK-EXECUTION.md) already permits concurrent execution
+of independent subscriptions on application workers while keeping each subscription serial.
+Historical validation counts below retain their original source, artifact and platform scope.
+
 ## Implemented components
 
 The [selected optional runtime profile](decisions/ADR-0006-live-runtime.md) has reproducible
@@ -119,7 +125,7 @@ source/artifact qualification; final integration results are recorded separately
 
 - Native XML construction, general Java-property resolution and live schema replacement are absent.
   The Java bridge supports only its documented settings and controlled source closure.
-- Indexed layouts, additional finite types, options/flags and compression are available only in their explicit catalog/source profiles. Recovery, unrestricted conversions, broader file-publication policies, real-clock integration, replay CLI and network transport remain outside the implemented boundary.
+- Tape indexed layouts, additional finite types, options/flags and compression require their explicit catalog/source profiles. Those profiles do not add receiving recovery or network transport; these are provided separately by the documented client/runtime profiles above. Unrestricted conversions, broader file-publication policies, a general real-clock replay adapter and a standalone replay CLI remain outside the offline replay boundary.
 - Raw tape timing and field bits do not by themselves imply business conversions, TICKER delivery or broad source integration. The typed feed mappings and their supported routes are documented in the [feed guide](FEED-API.md). The bounded local HISTORY projection is described separately in the [collector contract](../spec/subscriptions/HISTORY-COLLECTOR.md).
 - Complete private-source equality in [remaining gaps](REAL-TAPE-GAPS.md) is limited to its named ordinary MESSAGE profile; broader catalog cells use separate production fixtures.
 - macOS, a separate standalone LeakSanitizer certification and hostile concurrent filesystem
