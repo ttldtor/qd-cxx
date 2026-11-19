@@ -72,3 +72,6 @@
 - [Живые диапазоны HISTORY](subscriptions/LIVE-HISTORY-RANGES.ru.md): транзакции fromTime/set, applied fences доставки и сходимость wire demand.
 
 [Контракт локальной публикации записей](subscriptions/RECORD-PUBLICATION.ru.md).
+
+[Публичные подписки на записи](subscriptions/RECORD-FEED.ru.md): выбранный контракт RecordFeed,
+общий Endpoint, полные метаданные схемы, заимствование и владение с байтовым учётом; реализация впереди.

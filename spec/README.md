@@ -72,3 +72,6 @@ Exact conformance results belong to the [developer reading path](../docs/develop
 - [Live HISTORY ranges](subscriptions/LIVE-HISTORY-RANGES.md): accepted fromTime/set transactions, applied delivery fences and convergent wire demand.
 
 [Local record publication contract](subscriptions/RECORD-PUBLICATION.md).
+
+[Public record subscriptions](subscriptions/RECORD-FEED.md): selected RecordFeed contract,
+shared Endpoint, complete schema metadata, borrowing and byte-accounted ownership; implementation pending.
