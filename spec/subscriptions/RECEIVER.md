@@ -81,6 +81,11 @@ never substituted for event time. Synthesized projections do not manufacture sou
 
 ## Finite bounds and failures
 
+The [resource-limit contract](RESOURCE-LIMITS.md) separates the current high-level
+Feed profile ceilings from generic receiver limits and the accepted byte-budget
+replacement policy. Existing storage bounds remain effective until that migration
+is verified.
+
 `ReceiverLimits` bounds route count, summed complete shapes and summed declared selection
 allowances. Immutable receiver plans have separate storage from queue reservations;
 application captures and retained owning projections remain application-owned memory.
