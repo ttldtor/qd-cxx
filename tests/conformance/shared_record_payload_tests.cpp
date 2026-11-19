@@ -484,6 +484,42 @@ TEST_CASE("separate binding residency preserves complete retained capacity and r
     CHECK(consumer.usedBytes() == 0);
 }
 
+TEST_CASE("byte peak includes direct and throwing admission without charging rejected requests") {
+    d::RecordByteBudget budget(16);
+    const auto state = budget.state();
+    CHECK(state->peak.load() == 0);
+    const auto oversized = state->tryReserve(17);
+    REQUIRE_FALSE(oversized);
+    CHECK(oversized.error() == d::RecordBlockError::CAPACITY_EXCEEDED);
+    CHECK(state->peak.load() == 0);
+
+    {
+        REQUIRE(state->tryReserve(8));
+        const auto direct = d::RecordByteReservation::adopt(state, 8);
+        CHECK(state->peak.load() == 8);
+        state->reserve(4);
+        const auto wrapped = d::RecordByteReservation::adopt(state, 4);
+        CHECK(budget.usedBytes() == 12);
+        CHECK(state->peak.load() == 12);
+        const auto occupied = state->tryReserve(5);
+        REQUIRE_FALSE(occupied);
+        CHECK(occupied.error() == d::RecordBlockError::WOULD_BLOCK);
+        CHECK_THROWS_AS(state->reserve(5), d::RecordBlockError);
+        CHECK(budget.usedBytes() == 12);
+        CHECK(state->peak.load() == 12);
+    }
+
+    CHECK(budget.usedBytes() == 0);
+    CHECK(state->peak.load() == 12);
+    {
+        const d::RecordByteReservation wrapped(state, 16);
+        CHECK(budget.usedBytes() == 16);
+        CHECK(state->peak.load() == 16);
+    }
+    CHECK(budget.usedBytes() == 0);
+    CHECK(state->peak.load() == 16);
+}
+
 TEST_CASE("nonthrow reservation preserves permanent and occupied errors and adopts one exact credit") {
     d::RecordByteBudget budget(8);
     static_assert(noexcept(budget.state()->tryReserve(1)));

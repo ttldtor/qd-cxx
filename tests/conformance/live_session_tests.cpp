@@ -1,6 +1,7 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "../../src/protocol/shared_record_access.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
@@ -9,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bit>
 #include <cstdlib>
 #include <doctest/doctest.h>
@@ -19,6 +21,7 @@
 #include <limits>
 #include <new>
 #include <sstream>
+#include <thread>
 #include <type_traits>
 #include <utility>
 
@@ -33,6 +36,7 @@ std::size_t allocationsRemaining = 0; ///< Successful allocation requests before
 bool trackAllocations = false;        ///< Track only explicit production calls, excluding test-framework storage.
 std::size_t trackedBytes = 0;         ///< Outstanding request bytes allocated under tracking.
 std::size_t trackedPeak = 0;          ///< Highest simultaneous tracked backing.
+std::size_t trackedRequests = 0;      ///< Successful ordinary allocation requests in the current observation.
 
 /** Ordinary allocation request header, excluding allocator bookkeeping from reported request bytes. */
 struct alignas(std::max_align_t) AllocationHeader {
@@ -61,6 +65,7 @@ struct AllocationTracking {
     /** Begin one production-only observation, including earlier tracked owners still retained. */
     AllocationTracking() {
         trackedPeak = trackedBytes;
+        trackedRequests = 0;
         trackAllocations = true;
     }
 
@@ -362,6 +367,7 @@ void *operator new(std::size_t count) {
     header->tracked = trackAllocations;
 
     if (header->tracked) {
+        ++trackedRequests;
         trackedBytes += count;
         trackedPeak = std::max(trackedPeak, trackedBytes);
     }
@@ -1296,6 +1302,363 @@ TEST_CASE("nullable array object and UTFString values preserve exact payload own
     REQUIRE(nonempty[3].bytes);
     CHECK(nonempty[3].bytes->empty());
     CHECK_FALSE(nonempty[4].bytes);
+    auto owner = p::detail::SharedRecordAccess::retain(*retained, retained->records()[1]);
+    REQUIRE(owner->schema());
+    retained.reset();
+    CHECK(owner->schema()->records()[0].fields.size() == 5);
+    REQUIRE(owner->fields()[0].units);
+    CHECK(owner->fields()[0].units->size() == 40);
+    CHECK((*owner->fields()[0].units)[1] == static_cast<char16_t>(0xd800));
+    REQUIRE(owner->fields()[2].bytes);
+    CHECK(std::ranges::equal(*owner->fields()[2].bytes, std::array{std::byte{0}, std::byte{0xff}}));
+    CHECK(owner->fields()[3].bytes->empty());
+    CHECK_FALSE(owner->fields()[4].bytes);
+}
+
+TEST_CASE("receive owner-slot refusal precedes candidate allocation faults and preserves physical peak") {
+    auto bounds = limits();
+    bounds.owners = 4;
+    auto f = fixture(bounds);
+    (void)admit(f.session, ready());
+    const std::pair<std::u16string_view, std::int32_t> fields[]{{u"x", 8}};
+    (void)admit(f.session, description(90, u"Alpha", fields));
+    std::vector<std::byte> body;
+    const std::int64_t values[]{42};
+    record(body, 90, u"A", values);
+    const auto input = frame(15, body);
+    std::vector<p::LiveEvent> owners;
+
+    for (std::size_t i = 1; i < bounds.owners; ++i)
+        owners.push_back(admit(f.session, input));
+
+    const auto resident = f.session.residentBytes();
+    const auto peak = f.session.peakBytes();
+    const auto identity = f.session.peer().identity();
+    auto work = turn();
+    auto failed = [&] {
+        // The framer owns one payload allocation before dispatch; fail the first DATA candidate request.
+        constexpr std::size_t FRAME_PAYLOAD_REQUESTS = 1;
+        AllocationFault injection(FRAME_PAYLOAD_REQUESTS);
+
+        return f.session.feed(input, work);
+    }();
+    CHECK(failed.status == p::LiveStatus::FAILED);
+    CHECK_FALSE(failed.event);
+    CHECK(f.session.diagnostic().error == Error::RESOURCE_LIMIT);
+    CHECK(f.session.residentBytes() == resident);
+    CHECK(f.session.peakBytes() == peak);
+    CHECK(f.session.peer().identity().matches(identity));
+    CHECK(owners.front().records()[0].typedValues[0].raw == 42);
+}
+
+TEST_CASE("receive wrapper work refusal precedes its remaining descriptor growth allocations") {
+    auto bounds = limits();
+    constexpr std::size_t CONTROL_BYTES = 8192;
+    constexpr std::size_t DATA_BYTES = 65536;
+    bounds.eventBytes = bounds.snapshotBytes = bounds.scratchBytes = CONTROL_BYTES;
+    bounds.dataEventBytes = DATA_BYTES;
+    const std::pair<std::u16string_view, std::int32_t> fields[]{{u"x", 8}};
+    // Inline and heap symbols reach different monotonic growth boundaries on the qualified profiles.
+    const std::pair<std::size_t, std::u16string_view> shapes[]{{28, u"A"}, {32, u"AAAAAAAAAAAAAAAA"}};
+    bool avoidedGrowth = false;
+
+    for (const auto &[recordCount, symbol] : shapes) {
+        std::vector<std::byte> body;
+        const std::int64_t values[]{42};
+
+        for (std::size_t i = 0; i < recordCount; ++i)
+            record(body, 90, symbol, values);
+
+        const auto input = frame(15, body);
+        std::size_t fullRequests = 0, visits = 0, fullPeak = 0;
+
+        {
+            auto f = fixture(bounds);
+            (void)admit(f.session, ready());
+            (void)admit(f.session, description(90, u"Alpha", fields));
+            auto work = turn();
+            auto result = [&] {
+                AllocationTracking tracking;
+
+                return f.session.feed(input, work);
+            }();
+            REQUIRE(result.event);
+            REQUIRE(result.event->records().size() == recordCount);
+            fullRequests = trackedRequests;
+            visits = turn().visits - work.visits;
+            fullPeak = f.session.peakBytes();
+        }
+
+        auto f = fixture(bounds);
+        (void)admit(f.session, ready());
+        (void)admit(f.session, description(90, u"Alpha", fields));
+        const auto resident = f.session.residentBytes();
+        auto work = turn();
+        REQUIRE(visits > 0);
+        work.visits = visits - 1;
+        auto failed = [&] {
+            AllocationTracking tracking;
+
+            return f.session.feed(input, work);
+        }();
+        CHECK(failed.status == p::LiveStatus::FAILED);
+        CHECK_FALSE(failed.event);
+        CHECK(f.session.diagnostic().error == Error::WORK_LIMIT);
+        CHECK(f.session.residentBytes() == resident);
+        const bool avoidedForShape = f.session.peakBytes() < fullPeak;
+        avoidedGrowth = avoidedGrowth || avoidedForShape;
+        MESSAGE("receive descriptor boundary records=", recordCount, " symbolUnits=", symbol.size(),
+                " ordinary requests full=", fullRequests, " work-refused=", trackedRequests,
+                " physical peaks full=", fullPeak, " work-refused=", f.session.peakBytes());
+    }
+
+    // Reusing an existing chunk is valid; at least one shape must witness avoided backing growth.
+    CHECK(avoidedGrowth);
+}
+
+TEST_CASE("receive frame capacity exact fit and one short include detached control and wrapper descriptors") {
+    bool elastic = false;
+
+    SUBCASE("fixed backing") {
+    }
+    SUBCASE("elastic backing") {
+        elastic = true;
+    }
+
+    const auto accepts = [elastic](std::size_t capacity) {
+        auto bounds = limits();
+
+        if (elastic)
+            bounds.dataEventBytes = capacity;
+        else
+            bounds.eventBytes = capacity;
+
+        auto f = fixture(bounds);
+        (void)admit(f.session, ready());
+        const std::pair<std::u16string_view, std::int32_t> fields[]{{u"x", 8}};
+        (void)admit(f.session, description(90, u"Alpha", fields));
+        std::vector<std::byte> body;
+        const std::int64_t values[]{42};
+
+        for (std::size_t i = 0; i < 24; ++i)
+            record(body, 90, u"A", values);
+
+        const auto before = f.session.residentBytes();
+        const auto identity = f.session.peer().identity();
+        auto work = turn();
+        auto result = f.session.feed(frame(15, body), work);
+
+        if (result.event) {
+            CHECK(result.event->records().size() == 24);
+            CHECK(f.session.peakBytes() <= bounds.residentBytes);
+
+            return true;
+        }
+
+        CHECK(result.status == p::LiveStatus::FAILED);
+        CHECK(f.session.diagnostic().error == Error::RESOURCE_LIMIT);
+        CHECK(f.session.residentBytes() == before);
+        CHECK(f.session.peer().identity().matches(identity));
+
+        return false;
+    };
+    std::size_t low = 1;
+    auto high = limits().eventBytes;
+    REQUIRE(accepts(high));
+
+    while (low < high) {
+        const auto middle = low + (high - low) / 2;
+
+        if (accepts(middle))
+            high = middle;
+        else
+            low = middle + 1;
+    }
+
+    INFO("exact frame capacity=", low, " elastic=", elastic);
+    MESSAGE("receive minimum frame bytes=", low, " elastic=", elastic);
+    CHECK(accepts(low));
+    REQUIRE(low > 1);
+    CHECK_FALSE(accepts(low - 1));
+}
+
+TEST_CASE("every session creation allocation fault preserves input ownership before the final noexcept move") {
+    constexpr std::size_t MAX_CREATION_ALLOCATION_FAULTS = 64;
+    bool created = false;
+
+    for (std::size_t fault = 0; fault < MAX_CREATION_ALLOCATION_FAULTS; ++fault) {
+        auto local = schema();
+        const auto context = local.recordContext(0);
+        auto writer = composer(local, layouts());
+        auto work = turn();
+        auto result = [&] {
+            AllocationFault injection(fault);
+
+            return p::LiveSession::create(std::move(local), std::move(writer), limits(), work);
+        }();
+
+        if (result) {
+            created = true;
+            CHECK(result->peer().identity().matches(result->peer().identity()));
+
+            break;
+        }
+
+        CHECK(result.error() == Error::ALLOCATION_FAILURE);
+        REQUIRE(local.records().size() == 3);
+        CHECK(local.recordContext(0).matches(context));
+        CHECK(writer.matchesSchema(local));
+    }
+
+    CHECK(created);
+}
+
+TEST_CASE("receive frame aliases retain frozen inline payloads committed schema and pure capacity") {
+    using Payload = c::detail::SharedRecordPayload;
+    std::shared_ptr<const Payload> first;
+    std::shared_ptr<const Payload> last;
+    std::weak_ptr<const Payload> weak;
+    std::shared_ptr<c::detail::RecordByteState> physical;
+    p::LiveIdentity retainedIdentity;
+    std::uint64_t generation = 0;
+    auto bounds = limits();
+
+    SUBCASE("fixed frame backing") {
+    }
+    SUBCASE("elastic frame backing and decoded vector growth") {
+        bounds.dataEventBytes = bounds.eventBytes;
+    }
+
+    {
+        auto f = fixture(bounds);
+        (void)admit(f.session, ready());
+        const std::pair<std::u16string_view, std::int32_t> fields[]{{u"x", 8}};
+        (void)admit(f.session, description(90, u"Alpha", fields));
+        generation = f.session.peer().identity().generation();
+        retainedIdentity = f.session.peer().identity();
+        std::vector<std::byte> body;
+
+        for (std::int64_t i = 0; i < 24; ++i) {
+            const std::int64_t value[]{i};
+            record(body, 90, i == 0 ? u"A" : u"LAST", value);
+        }
+
+        {
+            auto event = admit(f.session, frame(15, body));
+            REQUIRE(event.records().size() == 24);
+            REQUIRE(p::detail::SharedRecordAccess::hasSharedRecords(event));
+            first = p::detail::SharedRecordAccess::retain(event, event.records().front());
+            last = p::detail::SharedRecordAccess::retain(event, event.records().back());
+            physical = p::detail::SharedRecordAccess::physicalState(event);
+            CHECK(first->symbol().data() == event.records().front().symbol.data());
+            CHECK(first->fields().size() == event.records().front().typedValues.size());
+            CHECK(first->batchIdentity() == last->batchIdentity());
+            CHECK(first->sourceGeneration() == generation);
+            CHECK(first->fixedOwnerIdentity() == nullptr);
+            CHECK(first->fixedOwnerBytes() == 0);
+            REQUIRE(first->schema());
+            CHECK(first->schema()->recordContext(0).matches(f.context[0]));
+            CHECK(first->schema()->records()[0].name == u"Alpha");
+            CHECK(first->schema()->records()[0].lookups[0].name == u"x");
+            CHECK(first->residentBytes() <= f.session.residentBytes());
+            weak = first;
+        }
+
+        const auto before = f.session.residentBytes();
+        const std::pair<std::u16string_view, std::int32_t> replacement[]{{u"x", 8}, {u"y", 8}};
+        (void)admit(f.session, description(90, u"Beta", replacement));
+        CHECK(f.session.peer().identity().generation() == generation + 1);
+        CHECK(first->sourceGeneration() == generation);
+        CHECK(first->fields()[0].raw == 0);
+        CHECK(last->fields()[0].raw == 23);
+        CHECK(first->symbol() == u"A");
+        CHECK(last->symbol() == u"LAST");
+        CHECK(f.session.residentBytes() >= first->residentBytes());
+        CHECK(before >= first->residentBytes());
+    }
+
+    REQUIRE(first->schema());
+    CHECK(first->schema()->records()[0].name == u"Alpha");
+    CHECK(physical->used.load() == first->residentBytes() + c::detail::RecordByteBudget::metadataAllocationBytes() +
+                                       retainedIdentity.releaseBytes());
+    retainedIdentity = {};
+    const auto retained = physical->used.load();
+    CHECK(retained >= first->residentBytes());
+    first.reset();
+    std::thread release([owner = std::move(last)]() mutable {
+        owner.reset();
+    });
+    release.join();
+    CHECK(weak.expired());
+    const auto weakCapacity = physical->used.load();
+    CHECK(weakCapacity < retained);
+    weak.reset();
+    CHECK(physical->used.load() < weakCapacity);
+    CHECK(physical->used.load() == c::detail::RecordByteBudget::metadataAllocationBytes());
+}
+
+TEST_CASE("detached receive release overlaps continued frame admission without operational owner slots") {
+    auto f = fixture();
+    (void)admit(f.session, ready());
+    const std::pair<std::u16string_view, std::int32_t> fields[]{{u"x", 8}};
+    (void)admit(f.session, description(90, u"Alpha", fields));
+    std::vector<std::byte> body;
+    const std::int64_t values[]{42};
+    record(body, 90, u"A", values);
+    const auto input = frame(15, body);
+    const auto baseline = f.session.residentBytes();
+    std::vector<std::shared_ptr<const c::detail::SharedRecordPayload>> owners;
+
+    for (std::size_t i = 0; i < 24; ++i) {
+        auto event = admit(f.session, input);
+        owners.push_back(p::detail::SharedRecordAccess::retain(event, event.records().front()));
+    }
+
+    std::atomic<bool> start{false};
+    std::atomic<bool> valid{true};
+    std::thread release([records = std::move(owners), &start, &valid]() mutable {
+        while (!start.load(std::memory_order_acquire))
+            std::this_thread::yield();
+
+        for (auto &owner : records) {
+            if (owner->symbol() != u"A" || owner->fields()[0].raw != 42 || !owner->schema())
+                valid.store(false);
+
+            owner.reset();
+            std::this_thread::yield();
+        }
+    });
+    start.store(true, std::memory_order_release);
+
+    for (std::size_t i = 0; i < 64; ++i) {
+        auto event = admit(f.session, input);
+        CHECK(event.records()[0].typedValues[0].raw == 42);
+    }
+
+    release.join();
+    CHECK(valid.load());
+    CHECK(f.session.residentBytes() == baseline);
+}
+
+TEST_CASE("receive malformed suffix publishes no decoded prefix and restores physical capacity") {
+    auto f = fixture();
+    (void)admit(f.session, ready());
+    const std::pair<std::u16string_view, std::int32_t> fields[]{{u"x", 8}};
+    (void)admit(f.session, description(90, u"Alpha", fields));
+    const auto committed = f.session.peer().identity();
+    std::vector<std::byte> body;
+    const std::int64_t values[]{42};
+    record(body, 90, u"A", values);
+    auto earlier = admit(f.session, frame(15, body));
+    const auto before = f.session.residentBytes();
+    body.push_back(std::byte{0xfd});
+    auto work = turn();
+    const auto failed = f.session.feed(frame(15, body), work);
+    CHECK(failed.status == p::LiveStatus::FAILED);
+    CHECK_FALSE(failed.event);
+    CHECK(f.session.peer().identity().matches(committed));
+    CHECK(f.session.residentBytes() == before);
+    CHECK(earlier.records()[0].typedValues[0].raw == 42);
 }
 
 TEST_CASE("data and output allocation faults preserve earlier owners and do not leak reservations") {
@@ -1306,7 +1669,9 @@ TEST_CASE("data and output allocation faults preserve earlier owners and do not 
     const auto input = frame(15, body);
     bool decoded = false;
 
-    for (std::size_t fault = 0; fault < 8; ++fault) {
+    constexpr std::size_t MAX_DATA_ALLOCATION_FAULTS = 32;
+
+    for (std::size_t fault = 0; fault < MAX_DATA_ALLOCATION_FAULTS; ++fault) {
         auto f = fixture();
         (void)admit(f.session, ready());
         (void)admit(f.session, description(90, u"Alpha", fields));

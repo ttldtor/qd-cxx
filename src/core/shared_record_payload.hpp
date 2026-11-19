@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #pragma once
 
+#include "qd/core/local_schema.hpp"
 #include "qd/core/serial_field_type.hpp"
 
 #include <algorithm>
@@ -88,6 +89,7 @@ class SharedRecordPayload {
     private:
     Batch *batch_ = nullptr;
     const std::byte *data_ = nullptr;
+    const char16_t *separateSymbol_ = nullptr;
     std::size_t symbolUnits_ = 0;
     std::size_t fields_ = 0;
     std::size_t bytes_ = 0;
@@ -98,6 +100,18 @@ class SharedRecordPayload {
     SharedRecordPayload(Batch *batch, const std::byte *data, std::size_t symbolUnits, std::size_t fields,
                         std::size_t bytes) noexcept
         : batch_(batch), data_(data), symbolUnits_(symbolUnits), fields_(fields), bytes_(bytes) {
+    }
+
+    /** Describe frozen arena output without copying its symbol or field payloads.
+     * @param batch Pure backing owner retained by the caller's aliasing shared control.
+     * @param symbol Immutable symbol storage, including inline storage in frozen decoded rows.
+     * @param fields Immutable final field descriptors owned by the same batch.
+     * @param bytes Logical row payload size; residentBytes() reports the complete retained owner.
+     */
+    SharedRecordPayload(Batch *batch, std::u16string_view symbol, std::span<const FieldValueView> fields,
+                        std::size_t bytes) noexcept
+        : batch_(batch), data_(reinterpret_cast<const std::byte *>(fields.data())), separateSymbol_(symbol.data()),
+          symbolUnits_(symbol.size()), fields_(fields.size()), bytes_(bytes) {
     }
 
     static std::size_t controlBytes();
@@ -128,6 +142,9 @@ class SharedRecordPayload {
     }
 
     [[nodiscard]] std::u16string_view symbol() const noexcept {
+        if (separateSymbol_)
+            return {separateSymbol_, symbolUnits_};
+
         return {reinterpret_cast<const char16_t *>(data_ + fields_ * sizeof(FieldValueView)), symbolUnits_};
     }
 
@@ -145,6 +162,26 @@ class SharedRecordPayload {
         return batch_;
     }
 
+    /** Whether consumers must choose copying when whole-frame retention exceeds their capacity.
+     * @return True for adopted receive frames, false for existing packed local storage.
+     */
+    [[nodiscard]] bool selectionSensitive() const noexcept;
+
+    /** Borrow a complete retained schema when this private owner has one.
+     * @return Immutable catalog valid through this payload alias, or null for unbound storage.
+     */
+    [[nodiscard]] const LocalSchema *schema() const noexcept;
+
+    /** Inspect the immutable numeric receive generation, without retaining a serialized identity.
+     * @return Committed receive generation; zero for existing unlabelled packed storage.
+     */
+    [[nodiscard]] std::uint64_t sourceGeneration() const noexcept;
+
+    /** Inspect the retained pure receive epoch label.
+     * @return Stable numeric origin while this owner lives; zero for unlabelled packed storage.
+     */
+    [[nodiscard]] std::uint64_t sourceOrigin() const noexcept;
+
     /** @return Separately reserved immutable metadata identity, or null for ordinary whole-retained accounting. */
     [[nodiscard]] const void *fixedOwnerIdentity() const noexcept;
     /** @return Capacity charged once to a matching metadata owner instead of every payload. */
@@ -160,6 +197,10 @@ struct SharedRecordPayload::Batch {
     SharedRecordPayload *rows = nullptr;
     SharedRecordPayload single;
     std::atomic<std::weak_ptr<void>> queueAccounting;
+    bool selectionSensitive = false;          ///< Receive frames may include large unselected payloads and a binding.
+    const LocalSchema *schema = nullptr;      ///< Borrowed from a pure derived owner, never a live binding plan.
+    std::uint64_t sourceGeneration = 0;       ///< Immutable committed receive label.
+    std::uint64_t sourceOrigin = 0;           ///< Pure epoch label; not global authentication.
     const void *fixedOwnerIdentity = nullptr; ///< Non-owning identity kept alive by the schema-bound derived batch.
     std::size_t fixedOwnerBytes = 0;          ///< Capacity reserved once in an exact matching consumer metadata domain.
 
@@ -194,6 +235,22 @@ inline const void *SharedRecordPayload::fixedOwnerIdentity() const noexcept {
 
 inline std::size_t SharedRecordPayload::fixedOwnerBytes() const noexcept {
     return batch_->fixedOwnerBytes;
+}
+
+inline bool SharedRecordPayload::selectionSensitive() const noexcept {
+    return batch_->selectionSensitive;
+}
+
+inline const LocalSchema *SharedRecordPayload::schema() const noexcept {
+    return batch_->schema;
+}
+
+inline std::uint64_t SharedRecordPayload::sourceGeneration() const noexcept {
+    return batch_->sourceGeneration;
+}
+
+inline std::uint64_t SharedRecordPayload::sourceOrigin() const noexcept {
+    return batch_->sourceOrigin;
 }
 
 inline std::atomic<std::weak_ptr<void>> &SharedRecordPayload::queueAccounting() const noexcept {

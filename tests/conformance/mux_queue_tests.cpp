@@ -10,6 +10,7 @@
 #include "../../src/mux/queue_replace.hpp"
 #include "../../src/mux/queue_schedule.hpp"
 #include "../../src/protocol/local_event_owner.hpp"
+#include "../../src/protocol/shared_record_access.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
@@ -1175,6 +1176,326 @@ TEST_CASE("shared local STREAM payload survives independent clients and serializ
         CHECK(valid.load());
         CHECK(lifetime.expired());
     }
+}
+
+TEST_CASE("typed receive ranges share with eligible clients and copy for smaller consumer quotas") {
+    auto bounds = queueLimits();
+
+    SUBCASE("one homogeneous range") {
+    }
+    SUBCASE("range split across source route groups") {
+        bounds.routeRecords = 1;
+    }
+
+    auto f = fixture(c::SubscriptionFamily::STREAM, bounds);
+    auto first = std::make_shared<Recorder>();
+    auto second = std::make_shared<Recorder>();
+    first->retain = second->retain = true;
+    auto large = clientLimits();
+    large.compactRecordArena = true;
+    auto small = large;
+    small.recordBytes = 16384;
+    auto a = open(f, first, large);
+    auto b = open(f, second, small);
+    add(f, a);
+    add(f, b);
+    const Input rows[]{{0, u"ALPHA", 1, 10, 0}, {0, u"ALPHA", 2, 11, 0}};
+    auto event = admit(f.live, data(rows, 15));
+    REQUIRE(p::detail::SharedRecordAccess::hasSharedRecords(event));
+    auto original = p::detail::SharedRecordAccess::retain(event, event.records().front());
+    std::weak_ptr<const c::detail::SharedRecordPayload> lifetime = original;
+    auto work = turn();
+    REQUIRE(f.queue.admit(std::move(event), work));
+    until(f, [&] {
+        return first->values.size() == 2 && second->values.size() == 2;
+    });
+    CHECK(first->values == std::vector<std::int64_t>{10, 11});
+    CHECK(second->values == first->values);
+    CHECK(first->retained.front().records().front().typedValues.data() == original->fields().data());
+    CHECK(second->retained.front().records().front().typedValues.data() != original->fields().data());
+    CHECK(first->retained.front().records().front().symbol.data() == original->symbol().data());
+    CHECK(second->retained.front().records().front().symbol.data() != original->symbol().data());
+    CHECK(f.queue.resources(b)->recordBytes < small.recordBytes);
+    CHECK(f.queue.resources(a)->recordBytes > f.queue.resources(b)->recordBytes);
+    REQUIRE(first->retained.front().records().front().source);
+    CHECK(first->retained.front().records().front().source->bindingGeneration == original->sourceGeneration());
+    original.reset();
+    first->retained.clear();
+    CHECK(lifetime.expired());
+    CHECK(second->retained.front().records().front().typedValues[2].raw == 10);
+    second->retained.clear();
+    CHECK(f.queue.resources(a)->recordBytes == 0);
+    CHECK(f.queue.resources(b)->recordBytes == 0);
+}
+
+TEST_CASE("two eligible receive clients retain exact text and opaque aliases after source destruction") {
+    struct PayloadConsumer : m::MuxConsumer {
+        std::vector<m::OwnedMuxBatch> retained;
+
+        m::BatchAction onBatch(const m::BorrowedMuxBatch &batch) override {
+            retained.push_back(batch.retain());
+
+            return m::BatchAction::CONTINUE;
+        }
+    };
+
+    auto first = std::make_shared<PayloadConsumer>();
+    auto second = std::make_shared<PayloadConsumer>();
+    std::u16string exact(40, u'x');
+    exact[0] = 0;
+    exact[1] = static_cast<char16_t>(0xd800);
+    exact.back() = u'Z';
+    const std::array opaque{std::byte{0}, std::byte{0xff}, std::byte{0}, std::byte{0x80}};
+    std::weak_ptr<const c::detail::SharedRecordPayload> lifetime;
+    const char16_t *symbolAddress = nullptr;
+    const char16_t *textAddress = nullptr;
+    const std::byte *byteAddress = nullptr;
+
+    {
+        const c::LocalRecord record{
+            0, u"Payload", false, {{8}, {137}, {9}}, {{u"Value", 0}, {u"Text", 1}, {u"Bytes", 2}}};
+        auto local =
+            c::LocalSchema::create(std::span(&record, 1), {1, 3, 3, 32, 256}, c::LocalProfile::BINARY_FIELDS_V1);
+        REQUIRE(local);
+        const p::OutgoingRecord declaration{41, 0, u"Payload", {{u"Value", 8, 0}, {u"Text", 137, 1}, {u"Bytes", 9, 2}}};
+        const auto makeWriter = [&] {
+            p::SubscriptionWriterWork work{10000, 1000000, 1000000, 1000000};
+            auto writer = p::SubscriptionWriter::create(*local, std::span(&declaration, 1),
+                                                        {{16, 128, 256, 128, 16384}, 16, 128, 128, 16384},
+                                                        {8192, 8201, 512, 1024, {8192, 1024}, 65536, 65536, 128}, work);
+            REQUIRE(writer);
+
+            return std::move(*writer);
+        };
+        auto producer = makeWriter();
+        auto sourceWriter = makeWriter();
+        auto incoming = *local;
+        auto liveWork = liveTurn();
+        auto source = p::LiveSession::create(std::move(incoming), std::move(sourceWriter), liveLimits(), liveWork);
+        REQUIRE(source);
+        (void)admit(*source, ready());
+        p::SubscriptionWriterWork outputWork{10000, 1000000, 1000000, 1000000};
+        const std::int32_t ids[]{41};
+        auto described = producer.describe(ids, outputWork);
+        REQUIRE(described);
+        (void)admit(*source, described->bytes());
+        const std::array values{
+            c::FieldValueView{c::SerialFieldType::COMPACT_INT, 42, {}, {}},
+            c::FieldValueView{c::SerialFieldType::STRING, 0, std::u16string_view(exact), {}},
+            c::FieldValueView{c::SerialFieldType::BYTE_ARRAY, 0, {}, std::span<const std::byte>(opaque)}};
+        auto next = values;
+        next[0].raw = 43;
+        const p::LiveDataRecordView rows[]{{41, u"ALPHA", values}, {41, u"ALPHA", next}};
+        auto wire = producer.composeData(p::LiveDataMessage::STREAM_DATA, rows, false, outputWork);
+        REQUIRE(wire);
+        auto event = admit(*source, wire->bytes());
+        auto original = p::detail::SharedRecordAccess::retain(event, event.records().front());
+        REQUIRE(original);
+        lifetime = original;
+        symbolAddress = original->symbol().data();
+        textAddress = original->fields()[1].units->data();
+        byteAddress = original->fields()[2].bytes->data();
+        auto work = turn();
+        auto queue = m::MuxQueue::createStream(*local, muxLimits(), desiredLimits(),
+                                               {8, 256, 4 * 1024 * 1024, 8 * 1024 * 1024}, queueLimits(), work);
+        REQUIRE(queue);
+        Fixture f{std::move(*local), std::move(*source), std::move(*queue), c::SubscriptionFamily::STREAM};
+        auto bounds = clientLimits();
+        bounds.compactRecordArena = true;
+        work = turn();
+        auto a = f.queue.open(bounds, first, work);
+        REQUIRE(a);
+        work = turn();
+        auto b = f.queue.open(bounds, second, work);
+        REQUIRE(b);
+        add(f, *a);
+        add(f, *b);
+        work = turn();
+        REQUIRE(f.queue.admit(std::move(event), work));
+        until(f, [&] {
+            return first->retained.size() == 1 && second->retained.size() == 1;
+        });
+        const auto &left = first->retained.front().records().front();
+        const auto &right = second->retained.front().records().front();
+        CHECK(left.symbol.data() == symbolAddress);
+        CHECK(right.symbol.data() == symbolAddress);
+        CHECK(left.typedValues[1].units->data() == textAddress);
+        CHECK(right.typedValues[1].units->data() == textAddress);
+        CHECK(left.typedValues[2].bytes->data() == byteAddress);
+        CHECK(right.typedValues[2].bytes->data() == byteAddress);
+        CHECK(f.queue.resources(*a)->recordBytes == f.queue.resources(*b)->recordBytes);
+        CHECK(f.queue.resources().recordBytes <
+              f.queue.resources(*a)->recordBytes + f.queue.resources(*b)->recordBytes);
+        CHECK(left.source->bindingGeneration == original->sourceGeneration());
+        CHECK(original->schema()->records()[0].lookups[1].name == u"Text");
+        original.reset();
+    }
+
+    CHECK_FALSE(lifetime.expired());
+    REQUIRE(first->retained.front().records().size() == 2);
+    CHECK(first->retained.front().records()[1].typedValues[0].raw == 43);
+    CHECK(*first->retained.front().records().front().typedValues[1].units == exact);
+    first->retained.clear();
+    CHECK_FALSE(lifetime.expired());
+    const auto &remaining = second->retained.front().records().front();
+    CHECK(remaining.symbol.data() == symbolAddress);
+    CHECK(remaining.typedValues[1].units->data() == textAddress);
+    CHECK(*remaining.typedValues[1].units == exact);
+    CHECK(remaining.typedValues[2].bytes->data() == byteAddress);
+    CHECK(std::ranges::equal(*remaining.typedValues[2].bytes, opaque));
+    std::thread release([batches = std::move(second->retained)]() mutable {
+        batches.clear();
+    });
+    release.join();
+    CHECK(lifetime.expired());
+}
+
+TEST_CASE("receive shared rows preserve copied byte-window padding and oversized-row fallback") {
+    const auto copiedBytes = [] {
+        auto probe = fixture(c::SubscriptionFamily::STREAM);
+        auto receiver = std::make_shared<Recorder>();
+        auto bounds = clientLimits();
+        bounds.compactRecordArena = true;
+        bounds.recordBytes = 16384;
+        auto handle = open(probe, receiver, bounds);
+        add(probe, handle);
+        send(probe, {{0, u"ALPHA", 1, 10, 0}}, true);
+
+        for (std::size_t i = 0; i < 100 && !probe.queue.resources(handle)->queuedRecords; ++i) {
+            auto work = turn();
+            REQUIRE(probe.queue.progressWithoutCallbacks(work));
+        }
+
+        REQUIRE(probe.queue.resources(handle)->queuedRecords == 1);
+        REQUIRE(receiver->values.empty());
+
+        return probe.queue.resources(handle)->recordBytes;
+    }();
+    REQUIRE(copiedBytes > 1);
+    auto large = clientLimits();
+    large.compactRecordArena = true;
+    bool shared = true;
+    std::size_t count = 2;
+
+    SUBCASE("callback window includes the original copied layout padding") {
+        large.batchRecordBytes = 2 * copiedBytes - 1;
+    }
+    SUBCASE("one copied row exceeds the enabled window") {
+        large.batchRecordBytes = copiedBytes - 1;
+        shared = false;
+        count = 1;
+    }
+
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto small = large;
+    small.recordBytes = 16384;
+    auto first = std::make_shared<Recorder>();
+    auto second = std::make_shared<Recorder>();
+    first->retain = second->retain = true;
+    auto a = open(f, first, large);
+    auto b = open(f, second, small);
+    add(f, a);
+    add(f, b);
+    const Input rows[]{{0, u"ALPHA", 1, 10, 0}, {0, u"ALPHA", 2, 11, 0}};
+    auto event = admit(f.live, data(std::span(rows).first(count), 15));
+    auto original = p::detail::SharedRecordAccess::retain(event, event.records().front());
+    auto work = turn();
+    REQUIRE(f.queue.admit(std::move(event), work));
+    until(f, [&] {
+        return first->values.size() == count && second->values.size() == count;
+    });
+    REQUIRE(second->retained.size() == count);
+    CHECK(first->retained.size() == second->retained.size());
+    CHECK(first->values == second->values);
+    const auto *fields = first->retained.front().records().front().typedValues.data();
+    CHECK((fields == original->fields().data()) == shared);
+}
+
+TEST_CASE("heterogeneous receive selection copies small rows instead of retaining unselected frame capacity") {
+    auto f = fixture(c::SubscriptionFamily::STREAM);
+    auto receiver = std::make_shared<Recorder>();
+    receiver->retain = true;
+    auto small = clientLimits();
+    small.compactRecordArena = true;
+    small.recordBytes = 16384;
+    auto handle = open(f, receiver, small);
+    add(f, handle);
+    std::vector<Input> rows{{0, u"ALPHA", 1, 42, 0}};
+
+    for (std::size_t i = 0; i < 96; ++i)
+        rows.push_back({1, u"UNSELECTED", 2, 99, 0});
+
+    auto event = admit(f.live, data(rows, 15));
+    auto original = p::detail::SharedRecordAccess::retain(event, event.records().front());
+    REQUIRE(original->residentBytes() > small.recordBytes);
+    std::weak_ptr<const c::detail::SharedRecordPayload> lifetime = original;
+    auto work = turn();
+    REQUIRE(f.queue.admit(std::move(event), work));
+    until(f, [&] {
+        return receiver->values.size() == 1;
+    });
+    CHECK(receiver->values == std::vector<std::int64_t>{42});
+    CHECK(receiver->retained.front().records().front().typedValues.data() != original->fields().data());
+    original.reset();
+    CHECK(lifetime.expired());
+    CHECK(f.queue.resources(handle)->recordBytes < small.recordBytes);
+}
+
+TEST_CASE("compact legacy receive frames preserve values in split and heterogeneous copied delivery") {
+    const c::LocalRecord records[]{
+        {0, u"Oracle#ONE", false, {{8}, {8}, {8}}, {{u"TimeHigh", 0}, {u"TimeLow", 1}, {u"Value", 2}}},
+        {1, u"Oracle#TWO", false, {{8}, {8}, {8}}, {{u"TimeHigh", 0}, {u"TimeLow", 1}, {u"Value", 2}}}};
+    auto local = c::LocalSchema::create(records, {2, 6, 6, 32, 256}, c::LocalProfile::COMPACT_INT_V1);
+    REQUIRE(local);
+    auto liveBounds = liveLimits();
+    liveBounds.events = p::DataEventPolicy::ZERO_FLAGS;
+    auto live = session(*local, liveBounds);
+    auto bounds = queueLimits();
+
+    SUBCASE("whole route") {
+    }
+    SUBCASE("split route") {
+        bounds.routeRecords = 1;
+    }
+
+    auto work = turn();
+    auto queue = m::MuxQueue::createStream(*local, muxLimits(), desiredLimits(),
+                                           {8, 256, 4 * 1024 * 1024, 8 * 1024 * 1024}, bounds, work);
+    REQUIRE(queue);
+    Fixture f{std::move(*local), std::move(live), std::move(*queue), c::SubscriptionFamily::STREAM};
+
+    struct LegacyConsumer : m::MuxConsumer {
+        std::vector<std::int32_t> values;
+        std::vector<m::OwnedMuxBatch> retained;
+
+        m::BatchAction onBatch(const m::BorrowedMuxBatch &batch) override {
+            for (const auto &row : batch.records()) {
+                REQUIRE(row.typedValues.empty());
+                REQUIRE(row.values.size() == 3);
+                values.push_back(row.values[2]);
+            }
+
+            retained.push_back(batch.retain());
+
+            return m::BatchAction::CONTINUE;
+        }
+    };
+
+    auto receiver = std::make_shared<LegacyConsumer>();
+    work = turn();
+    auto handle = f.queue.open(clientLimits(), receiver, work);
+    REQUIRE(handle);
+    add(f, *handle);
+    const Input rows[]{{0, u"ALPHA", 1, 10, 0}, {1, u"UNSELECTED", 2, 99, 0}, {0, u"ALPHA", 3, 11, 0}};
+    auto event = admit(f.live, data(rows, 15));
+    CHECK_FALSE(p::detail::SharedRecordAccess::hasSharedRecords(event));
+    work = turn();
+    REQUIRE(f.queue.admit(std::move(event), work));
+    until(f, [&] {
+        return receiver->values.size() == 2;
+    });
+    CHECK(receiver->values == std::vector<std::int32_t>{10, 11});
+    CHECK(receiver->retained.front().records().front().values[2] == 10);
 }
 
 TEST_CASE("flat local STREAM batch shares backing across split route groups and clients") {
