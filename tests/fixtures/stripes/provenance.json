@@ -1,0 +1,114 @@
+{
+  "revision": "0ddc0a09779fb61d74cc0b37c6449ff47dcb715f",
+  "javaVersion": "openjdk version \"1.8.0_422\"",
+  "javaSha256": "9052cbf792ced0c3dfeb8593483dc3aa543b7077b52a49f31fb0e93f2e16ba58",
+  "javacSha256": "633143e961aa18051c09112b85333f5cdbd845b54eb39678eb15b91ca8bbb527",
+  "harnessSha256": "a9711845ed1007455010d7f80971134ac2b846db3545b5d875d6db250c620ca2",
+  "collectorHarnessSha256": "d42361f4e717bca2cc0bb56562709ba569af1c8c3623426f551d68ec2bfb3628",
+  "generatedClassesSha256": "17b7c0f5c79685639e974e5f3006eceb70eff21f4b2c167e76c805d137fdd316",
+  "collectorFixtureSha256": "89ff9c767af0a0c61c085ad5e642f8d521bdce3195bccb066286673d1d00f4fd",
+  "collectorRows": 184,
+  "launcherSha256": "ade94cd4191730495422c5debb70ef0cdb9bac180f55079b9feba9fd37d7b716",
+  "upstreamSources": [
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/SymbolStriper.java",
+      "sha256": "e5e44c2fb1f4cf653d5b7d8cfa2a318714eabeb345d54d0200fc9767938b4742"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/SymbolStriperFactoryImpl.java",
+      "sha256": "42da0412c0da3eacb17c508b66f9da171f19334ad89857e3759744ca466ebe7e"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/MonoStriper.java",
+      "sha256": "f2898c496d79dac5b7c45e5f3b4c0f00293203eeaa61a1a3734f5b5b0ea7ef60"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/HashStriper.java",
+      "sha256": "7cdd8f865f52bb4806ecfdf085fa7476f197e649d04b56e776eb0ae015009361"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/HashFilter.java",
+      "sha256": "5984fd80ccdd2d20e24e46153db234f2bfc2a9bac388a247604a343b75cb4a03"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/RangeStriper.java",
+      "sha256": "bb6d2134a948aad3240485c8ecc761301e3a59914aa2ccba12ce6524e05480ba"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/RangeFilter.java",
+      "sha256": "38558693ba973f8005e9c9fc56b4081f5378384efa1c519897d9346e9e6ecb73"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/RangeUtil.java",
+      "sha256": "c4b1be20f6062270ea74cd2aa785790bd37189d0bee7846d7dabec02f2527670"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/CompositeFilters.java",
+      "sha256": "454ccf1eedf48f003eb0595fcf34eb3520d5bec32127d32d689207af0c75ed4b"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/kit/PatternFilter.java",
+      "sha256": "e1c05887631596af70149eaa7ea06b834d940386bd83175d4df327a727835e7a"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/AbstractBuilder.java",
+      "sha256": "76be912c385f8a58af9f8ff46ac3965ca183cf199704eb1f9adc9dfd2b7a9b47"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/matrix/Agent.java",
+      "sha256": "1b76b0dfe9ee021e0d3c43899ed3acf36186c3332ae9b0747e1eae6f150afbc7"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/matrix/Stream.java",
+      "sha256": "5f6c1ffefcb48f682a6803404c2f17c0d82c02742b5deeda3316d72ffd303755"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/matrix/Ticker.java",
+      "sha256": "f3de1d9fae3797a686292811369553ad5142dd6798bbefc0557569fb9a1cb211"
+    },
+    {
+      "path": "qd-core/src/main/java/com/devexperts/qd/impl/matrix/History.java",
+      "sha256": "462c4cf966c1db8bd6db4072c0512e5713454fd6165ad5b744113c629ac3a42d"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedAgent.java",
+      "sha256": "5b80075e946401fdcaf8df003a20307fe913433952909d9415fcb7d54e89a4c5"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedBuffersUtil.java",
+      "sha256": "14046d388151e24bf1b08d1d7f3f2eb19260d746a53614ce18ed6d14b3146636"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedCollector.java",
+      "sha256": "44fdfb75d37fc580c39c2d9baea0b892709c2912addccd42bac5ad753c3fc13a"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedDistributor.java",
+      "sha256": "4ec8fafeff78e24102c2a468291cfeb1272a1fc27fb0adfae3cc0a3b80839d4d"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedFactory.java",
+      "sha256": "30d40e2545ceab6179340f78440808816d90c2a4c8d444e047f071459600a230"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedHistory.java",
+      "sha256": "2d5a2f1b263ca0b234cc83e5e4ba84aaaf8206c301fcbff548bc1e462b6d0d4b"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedNotification.java",
+      "sha256": "a3ae8de7d64c2234c2352b4d0a33eb7740a0b75da816293e0f036e909e4f85b0"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedStream.java",
+      "sha256": "78e883a548934e791e1c0a26c40015b7c5ea0a0963d6925ea6a6cc7525dafb27"
+    },
+    {
+      "path": "qd-stripe/src/main/java/com/devexperts/qd/impl/stripe/StripedTicker.java",
+      "sha256": "79a2b3ad0a52ef8baa335c0eecc397c4c13a1c1c8421fc045de1933a84b7c8b5"
+    }
+  ],
+  "productionClassInventorySha256": "90a478b5d3737246d8c897322c9f9db60887846e20117572588e05ae78fbc6d8",
+  "fixtureSha256": "d235b0d738b96ec1c992a42ccaf78a740be399d8daccda21c9656fd682c85e98",
+  "rows": 1263,
+  "timezoneInvariant": true
+}

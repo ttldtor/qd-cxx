@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "../../src/protocol/shared_record_access.hpp"
+#include "../../src/protocol/stripe_event_access.hpp"
 #include "qd/encoding/compact.hpp"
 #include "qd/encoding/utf_char.hpp"
 #include "qd/encoding/utf_string.hpp"
@@ -2227,4 +2228,67 @@ TEST_CASE("EndpointId visit and whole payload work shortage never publishes a pa
     const auto payloadShort = endpointRefusal("long-uid", Error::WORK_LIMIT, limits(), byteWork);
     CHECK(payloadShort.stage == "protocol");
     CHECK(payloadShort.consumed == 0);
+}
+
+TEST_CASE("stripe network slices retain one pure receive backing and original generation without a parent event") {
+    std::optional<p::LiveEvent> slice;
+    std::shared_ptr<const c::detail::SharedRecordPayload> retained;
+    std::shared_ptr<c::detail::RecordByteState> physical;
+    std::uint64_t generation = 0;
+
+    {
+        auto f = fixture();
+        (void)admit(f.session, ready());
+        const std::pair<std::u16string_view, std::int32_t> fields[]{{u"x", 8}};
+        (void)admit(f.session, description(90, u"Alpha", fields));
+        generation = f.session.peer().identity().generation();
+        std::vector<std::byte> body;
+
+        for (std::int64_t index = 0; index < 24; ++index) {
+            const std::int64_t value[]{index};
+            record(body, 90, index == 0 ? u"A" : u"LAST", value);
+        }
+
+        {
+            auto source = admit(f.session, frame(15, body));
+            const std::array selected{std::size_t{0}, std::size_t{7}, std::size_t{23}};
+            const p::detail::StripeEventLimits bounds{65536, 65536, 1024 * 1024};
+            auto work = turn();
+            auto measured = p::detail::StripeEventAccess::measure(source, selected, bounds, work);
+            REQUIRE(measured);
+            const auto first = p::detail::SharedRecordAccess::retain(source, source.records().front());
+            CHECK(measured->retainedPayloadBytes == first->residentBytes());
+            work = turn();
+            auto result = p::detail::StripeEventAccess::select(source, selected, bounds, work);
+            REQUIRE(result);
+            REQUIRE(result->records().size() == 3);
+            CHECK(result->snapshot().identity().sameEpoch(source.snapshot().identity()));
+            CHECK(result->records()[0].symbol.data() == source.records()[0].symbol.data());
+            CHECK(result->records()[2].typedValues[0].raw == 23);
+            CHECK(result->records()[2].senderId == 90);
+            CHECK(result->residentBytes() ==
+                  measured->metadataBytes + measured->copiedPayloadBytes + measured->retainedPayloadBytes);
+            physical = p::detail::SharedRecordAccess::physicalState(source);
+            slice.emplace(std::move(*result));
+        }
+
+        const std::pair<std::u16string_view, std::int32_t> replacement[]{{u"x", 8}, {u"y", 8}};
+        (void)admit(f.session, description(90, u"Beta", replacement));
+        CHECK(f.session.peer().identity().generation() == generation + 1);
+        CHECK(slice->snapshot().identity().generation() == generation);
+    }
+
+    REQUIRE(slice);
+    CHECK(slice->records()[1].typedValues[0].raw == 7);
+    retained = p::detail::SharedRecordAccess::retain(*slice, slice->records()[2]);
+    REQUIRE(retained);
+    CHECK(retained->sourceGeneration() == generation);
+    slice.reset();
+    CHECK(retained->schema()->records()[0].name == u"Alpha");
+    CHECK(physical->used.load() == retained->residentBytes() + c::detail::RecordByteBudget::metadataAllocationBytes());
+    std::thread release([payload = std::move(retained)]() mutable {
+        payload.reset();
+    });
+    release.join();
+    CHECK(physical->used.load() == c::detail::RecordByteBudget::metadataAllocationBytes());
 }

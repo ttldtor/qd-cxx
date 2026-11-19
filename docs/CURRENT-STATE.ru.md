@@ -175,3 +175,5 @@ Plain-режим CLI по умолчанию сохраняет поведени
 ### Предыдущий снимок проверок TLS-компонента
 
 Предыдущий снимок TLS-компонента прошёл 39 native-тестов: Windows MSVC 19.42 x64 Release /MD — 11 486 проверок; Linux GCC 13.3 x64 Debug ASan+UBSan — 11 625 проверок, LSan выключен. Его регрессия на каждой ОС прошла 58/58 тестов с JSON и 57/57 без JSON. Установленный пакет прошёл четыре TLS 1.2/1.3 запуска на двух ОС. Эти исторические числа сохраняют исходные границы. Новая [квалификация получения](../tests/conformance/subscriptions/DELIVERY-VALIDATION.ru.md) описывает составной CLI, контролируемый TLS-процесс и итоговую матрицу получения.
+
+Тот же optional target предоставляет [локальную MUX composition по полосам](../spec/mux/STRIPES.ru.md): точные immutable разбиения символов, настоящие per-stripe native collectors, независимые multi-consumer queues, возобновляемый partial progress, native inspection/reset и явные child outcomes. Root и child capacities отдельны; транспорт и execution scheduling внешние.

@@ -89,6 +89,8 @@ The [plain IPF reader oracle](../upstream/ipf-reader-oracle/README.md) captures/
 
 [Explicit IPF transfer dependency preparation](../deps/IPF-TRANSFER.md) provides pinned Boost1.92.0 sources, a standalone static URL build, EN/RU helper help, offline/cache checks and a sealed relocatable private SDK. It adds no production transfer API and performs no acquisition in ordinary configure or dependency OFF mode.
 
+The [symbol stripe production oracle](../upstream/stripe-oracle/README.md) observes pinned MONO/HASH/RANGE grammar, symbol selection, all stripe leaves and filter overlap with explicit JDK8/reference/logger/run inputs. No arguments or standalone EN/RU help starts a workload.
+
 ## First build
 
 Run from the repository root. This bootstrap is the explicit first-build logging exception:

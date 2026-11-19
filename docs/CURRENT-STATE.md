@@ -171,3 +171,5 @@ certification are not established by these component results.
 ### Earlier TLS component snapshot
 
 The earlier TLS component snapshot passed 39 native tests: Windows MSVC 19.42 x64 Release /MD, 11,486 assertions; Linux GCC 13.3 x64 Debug ASan+UBSan, 11,625 assertions, with LSan disabled. Its regression passed on each OS: 58/58 tests with JSON enabled and 57/57 with JSON disabled. The installed package passed four TLS 1.2/1.3 cases across both OSes. These historical counts retain their original scope. The newer [receiving qualification](../tests/conformance/subscriptions/DELIVERY-VALIDATION.md) records the composed CLI, closed TLS process and final receiving matrix.
+
+The same optional target provides [striped local MUX composition](../spec/mux/STRIPES.md): exact immutable symbol partitions, real per-stripe native family collectors, independent multi-consumer queues, resumable partial progress, native inspection/reset and explicit child outcomes. Root and child capacities remain separate; transport and execution scheduling remain external.

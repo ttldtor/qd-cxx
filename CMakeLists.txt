@@ -18,7 +18,7 @@ target_include_directories(qdcxx_encoding PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURR
 target_compile_features(qdcxx_encoding PUBLIC cxx_std_23)
 set_target_properties(qdcxx_encoding PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(qdcxx_core src/core/local_schema.cpp src/core/wide_decimal.cpp src/core/subscription.cpp)
+add_library(qdcxx_core src/core/local_schema.cpp src/core/wide_decimal.cpp src/core/subscription.cpp src/core/symbol_striper.cpp)
 target_include_directories(qdcxx_core PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 target_compile_features(qdcxx_core PUBLIC cxx_std_23)
@@ -271,7 +271,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_CLIENT)
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-    add_library(qdcxx_mux_queue src/mux/queue.cpp)
+    add_library(qdcxx_mux_queue src/mux/queue.cpp src/mux/striped.cpp)
     target_link_libraries(qdcxx_mux_queue PUBLIC qdcxx_mux qdcxx_collectors Threads::Threads)
     target_link_libraries(qdcxx_client PUBLIC qdcxx_mux_queue qdcxx_quote qdcxx_profile qdcxx_trade qdcxx_trade_eth qdcxx_summary qdcxx_order qdcxx_series qdcxx_greeks qdcxx_underlying qdcxx_theo_price qdcxx_time_and_sale qdcxx_option_sale qdcxx_market_maker qdcxx_derived_order qdcxx_text_events qdcxx_misc_events qdcxx_candle)
     set_target_properties(qdcxx_mux_queue PROPERTIES CXX_EXTENSIONS OFF)
@@ -279,7 +279,7 @@ if(ORG_TTLDTOR_QDCXX_BUILD_CLIENT)
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-    install(FILES include/qd/mux/queue.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/mux")
+    install(FILES include/qd/mux/queue.hpp include/qd/mux/striped.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd/mux")
     install(DIRECTORY include/qd/client
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp")
 endif()
@@ -417,7 +417,7 @@ install(TARGETS qdcxx_encoding qdcxx_core qdcxx_protocol qdcxx_collectors qdcxx_
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY include/qd/core include/qd/encoding include/qd/protocol include/qd/collectors include/qd/events include/qd/mux
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp" PATTERN "queue.hpp" EXCLUDE)
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/qd" FILES_MATCHING PATTERN "*.hpp" PATTERN "queue.hpp" EXCLUDE PATTERN "striped.hpp" EXCLUDE)
 install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/qdcxx/licenses" RENAME qdcxx-LICENSE.txt)
 configure_package_config_file(cmake/qdcxxConfig.cmake.in "${CMAKE_CURRENT_BINARY_DIR}/qdcxxConfig.cmake"
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/qdcxx"
@@ -732,6 +732,11 @@ if(BUILD_TESTING)
 
     find_program(ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH NAMES pwsh)
     if(ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH)
+        add_test(NAME stripe_oracle_help COMMAND "${CMAKE_COMMAND}"
+            "-DORG_TTLDTOR_QDCXX_STRIPE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DORG_TTLDTOR_QDCXX_STRIPE_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/stripe_oracle_help.cmake")
+        set_tests_properties(stripe_oracle_help PROPERTIES TIMEOUT 120)
         add_test(NAME selector_oracle_help COMMAND "${CMAKE_COMMAND}"
             "-DORG_TTLDTOR_QDCXX_SELECTOR_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}"
             "-DORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH=${ORG_TTLDTOR_QDCXX_SELECTOR_ORACLE_PWSH}"
@@ -1225,6 +1230,11 @@ if(BUILD_TESTING)
             set_target_properties(qdcxx_tape_feed_tests PROPERTIES CXX_EXTENSIONS OFF)
             add_test(NAME tape_feed COMMAND qdcxx_tape_feed_tests)
             set_tests_properties(tape_feed PROPERTIES TIMEOUT 60)
+            add_executable(qdcxx_stripe_filter_boundary_tests tests/conformance/stripe_filter_boundary_tests.cpp)
+            target_link_libraries(qdcxx_stripe_filter_boundary_tests PRIVATE qdcxx_feed doctest::doctest)
+            set_target_properties(qdcxx_stripe_filter_boundary_tests PROPERTIES CXX_EXTENSIONS OFF)
+            add_test(NAME stripe_filter_boundary COMMAND qdcxx_stripe_filter_boundary_tests)
+            set_tests_properties(stripe_filter_boundary PROPERTIES TIMEOUT 60)
             add_executable(qdcxx_feed_filter_tests tests/conformance/feed_filter_tests.cpp)
             target_include_directories(qdcxx_feed_filter_tests PRIVATE src/api)
             target_link_libraries(qdcxx_feed_filter_tests PRIVATE qdcxx_feed doctest::doctest)
@@ -1937,6 +1947,27 @@ if(BUILD_TESTING)
     endif()
     set_target_properties(qdcxx_wildcard_subscription_tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME wildcard_subscriptions COMMAND qdcxx_wildcard_subscription_tests)
+    if(ORG_TTLDTOR_QDCXX_BUILD_CLIENT)
+        add_executable(qdcxx_striped_mux_tests tests/conformance/striped_mux_tests.cpp)
+        target_link_libraries(qdcxx_striped_mux_tests PRIVATE qdcxx_mux_queue qdcxx_quote doctest::doctest Threads::Threads)
+        target_compile_definitions(qdcxx_striped_mux_tests PRIVATE
+            "ORG_TTLDTOR_QDCXX_STRIPE_COLLECTOR_FIXTURE=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/stripes/collectors.tsv\"")
+        set_target_properties(qdcxx_striped_mux_tests PROPERTIES CXX_EXTENSIONS OFF)
+        add_test(NAME mux_striped COMMAND qdcxx_striped_mux_tests)
+        set_tests_properties(mux_striped PROPERTIES TIMEOUT 120)
+    endif()
+    add_executable(qdcxx_stripe_event_tests tests/conformance/stripe_event_tests.cpp)
+    target_link_libraries(qdcxx_stripe_event_tests PRIVATE qdcxx_protocol doctest::doctest Threads::Threads)
+    set_target_properties(qdcxx_stripe_event_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME protocol_stripe_event COMMAND qdcxx_stripe_event_tests)
+    set_tests_properties(protocol_stripe_event PROPERTIES TIMEOUT 60)
+    add_executable(qdcxx_symbol_striper_tests tests/conformance/symbol_striper_tests.cpp)
+    target_link_libraries(qdcxx_symbol_striper_tests PRIVATE qdcxx_core qdcxx_encoding doctest::doctest)
+    target_compile_definitions(qdcxx_symbol_striper_tests PRIVATE
+        "ORG_TTLDTOR_QDCXX_STRIPE_FIXTURE=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/stripes/oracle.tsv\"")
+    set_target_properties(qdcxx_symbol_striper_tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME core_symbol_striper COMMAND qdcxx_symbol_striper_tests)
+    set_tests_properties(core_symbol_striper PROPERTIES TIMEOUT 60)
     add_executable(qdcxx_subscription_state_tests tests/conformance/subscription_state_tests.cpp)
     target_link_libraries(qdcxx_subscription_state_tests PRIVATE qdcxx_core doctest::doctest)
     set_target_properties(qdcxx_subscription_state_tests PROPERTIES CXX_EXTENSIONS OFF)

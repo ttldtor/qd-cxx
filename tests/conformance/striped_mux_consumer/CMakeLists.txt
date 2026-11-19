@@ -1,0 +1,23 @@
+# Copyright (c) 2026 ttldtor.
+# SPDX-License-Identifier: BSL-1.0
+# Independent installed-package consumer; set qdcxx_DIR to the relocated package explicitly.
+cmake_minimum_required(VERSION 3.25)
+project(qdcxx_striped_mux_consumer LANGUAGES CXX)
+find_package(qdcxx CONFIG REQUIRED)
+if(NOT TARGET qdcxx_mux_queue)
+    message(FATAL_ERROR "This consumer needs an installation built with CLIENT=ON")
+endif()
+add_executable(qdcxx_striped_mux_consumer main.cpp)
+target_link_libraries(qdcxx_striped_mux_consumer PRIVATE qdcxx_mux_queue)
+if(WIN32)
+    target_sources(qdcxx_striped_mux_consumer PRIVATE windows_headers.cpp)
+endif()
+foreach(header IN ITEMS core/symbol_striper mux/striped)
+    string(REPLACE "/" "_" name "${header}")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${name}.cpp" "#include <qd/${header}.hpp>\n")
+    target_sources(qdcxx_striped_mux_consumer PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/${name}.cpp")
+endforeach()
+set_target_properties(qdcxx_striped_mux_consumer PROPERTIES CXX_EXTENSIONS OFF)
+enable_testing()
+add_test(NAME installed_striped_mux COMMAND qdcxx_striped_mux_consumer)
+set_tests_properties(installed_striped_mux PROPERTIES TIMEOUT 20)

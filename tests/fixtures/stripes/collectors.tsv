@@ -1,0 +1,184 @@
+size	Stream:by1	initial	4	3	2
+record	Stream:by1	first	0	0041,0041,0050,004C	10	101	0
+record	Stream:by1	first	1	0049,0042,004D	11	102	0
+record	Stream:by1	first	2	004D,0053,0046,0054	12	103	0
+drain	Stream:by1	first	3	2	false
+record	Stream:by1	second	0	0049,0042,004D	11	102	0
+record	Stream:by1	second	1	0053,0050,0059	13	104	0
+drain	Stream:by1	second	2	1	false
+drain	Stream:by1	snapshot-first	0	1	false
+drops	Stream:by1	initial	0	0
+size	Stream:by1	replacement	2	1	2
+record	Stream:by1	replacement-first	0	0053,0050,0059	13	204	0
+drain	Stream:by1	replacement-first	1	1	false
+record	Stream:by1	replacement-second	0	0049,0042,004D	11	202	0
+record	Stream:by1	replacement-second	1	0053,0050,0059	13	204	0
+drain	Stream:by1	replacement-second	2	1	false
+size	Stream:by1	first-closed	2	0	2
+closed-child	Stream:by1	0	0
+size	Stream:byhash4	initial	4	3	2
+record	Stream:byhash4	first	0	0041,0041,0050,004C	10	101	0
+record	Stream:byhash4	first	1	0049,0042,004D	11	102	0
+record	Stream:byhash4	first	2	004D,0053,0046,0054	12	103	0
+drain	Stream:byhash4	first	3	2	false
+record	Stream:byhash4	second	0	0049,0042,004D	11	102	0
+record	Stream:byhash4	second	1	0053,0050,0059	13	104	0
+drain	Stream:byhash4	second	2	1	false
+drain	Stream:byhash4	snapshot-first	0	1	false
+drops	Stream:byhash4	initial	0	0
+size	Stream:byhash4	replacement	2	1	2
+record	Stream:byhash4	replacement-first	0	0053,0050,0059	13	204	0
+drain	Stream:byhash4	replacement-first	1	1	false
+record	Stream:byhash4	replacement-second	0	0049,0042,004D	11	202	0
+record	Stream:byhash4	replacement-second	1	0053,0050,0059	13	204	0
+drain	Stream:byhash4	replacement-second	2	1	false
+size	Stream:byhash4	first-closed	2	0	2
+closed-child	Stream:byhash4	0	0
+closed-child	Stream:byhash4	1	0
+closed-child	Stream:byhash4	2	0
+closed-child	Stream:byhash4	3	0
+size	Stream:byrange-D-M-	initial	4	3	2
+record	Stream:byrange-D-M-	first	0	0049,0042,004D	11	102	0
+record	Stream:byrange-D-M-	first	1	004D,0053,0046,0054	12	103	0
+record	Stream:byrange-D-M-	first	2	0041,0041,0050,004C	10	101	0
+drain	Stream:byrange-D-M-	first	3	2	false
+record	Stream:byrange-D-M-	second	0	0049,0042,004D	11	102	0
+record	Stream:byrange-D-M-	second	1	0053,0050,0059	13	104	0
+drain	Stream:byrange-D-M-	second	2	1	false
+drain	Stream:byrange-D-M-	snapshot-first	0	1	false
+drops	Stream:byrange-D-M-	initial	0	0
+size	Stream:byrange-D-M-	replacement	2	1	2
+record	Stream:byrange-D-M-	replacement-first	0	0053,0050,0059	13	204	0
+drain	Stream:byrange-D-M-	replacement-first	1	1	false
+record	Stream:byrange-D-M-	replacement-second	0	0049,0042,004D	11	202	0
+record	Stream:byrange-D-M-	replacement-second	1	0053,0050,0059	13	204	0
+drain	Stream:byrange-D-M-	replacement-second	2	1	false
+size	Stream:byrange-D-M-	first-closed	2	0	2
+closed-child	Stream:byrange-D-M-	0	0
+closed-child	Stream:byrange-D-M-	1	0
+closed-child	Stream:byrange-D-M-	2	0
+size	Ticker:by1	initial	4	3	2
+record	Ticker:by1	first	0	0041,0041,0050,004C	10	101	0
+record	Ticker:by1	first	1	004D,0053,0046,0054	12	103	0
+record	Ticker:by1	first	2	0049,0042,004D	11	102	0
+drain	Ticker:by1	first	3	2	false
+record	Ticker:by1	second	0	0049,0042,004D	11	102	0
+record	Ticker:by1	second	1	0053,0050,0059	13	104	0
+drain	Ticker:by1	second	2	1	false
+drain	Ticker:by1	snapshot-first	0	1	false
+drops	Ticker:by1	initial	0	0
+size	Ticker:by1	replacement	2	1	2
+record	Ticker:by1	replacement-first	0	0053,0050,0059	13	204	0
+drain	Ticker:by1	replacement-first	1	1	false
+record	Ticker:by1	replacement-second	0	0049,0042,004D	11	202	0
+record	Ticker:by1	replacement-second	1	0053,0050,0059	13	204	0
+drain	Ticker:by1	replacement-second	2	1	false
+size	Ticker:by1	first-closed	2	0	2
+closed-child	Ticker:by1	0	0
+size	Ticker:byhash4	initial	4	3	2
+record	Ticker:byhash4	first	0	0041,0041,0050,004C	10	101	0
+record	Ticker:byhash4	first	1	004D,0053,0046,0054	12	103	0
+record	Ticker:byhash4	first	2	0049,0042,004D	11	102	0
+drain	Ticker:byhash4	first	3	2	false
+record	Ticker:byhash4	second	0	0049,0042,004D	11	102	0
+record	Ticker:byhash4	second	1	0053,0050,0059	13	104	0
+drain	Ticker:byhash4	second	2	1	false
+drain	Ticker:byhash4	snapshot-first	0	1	false
+drops	Ticker:byhash4	initial	0	0
+size	Ticker:byhash4	replacement	2	1	2
+record	Ticker:byhash4	replacement-first	0	0053,0050,0059	13	204	0
+drain	Ticker:byhash4	replacement-first	1	1	false
+record	Ticker:byhash4	replacement-second	0	0049,0042,004D	11	202	0
+record	Ticker:byhash4	replacement-second	1	0053,0050,0059	13	204	0
+drain	Ticker:byhash4	replacement-second	2	1	false
+size	Ticker:byhash4	first-closed	2	0	2
+closed-child	Ticker:byhash4	0	0
+closed-child	Ticker:byhash4	1	0
+closed-child	Ticker:byhash4	2	0
+closed-child	Ticker:byhash4	3	0
+size	Ticker:byrange-D-M-	initial	4	3	2
+record	Ticker:byrange-D-M-	first	0	0049,0042,004D	11	102	0
+record	Ticker:byrange-D-M-	first	1	004D,0053,0046,0054	12	103	0
+record	Ticker:byrange-D-M-	first	2	0041,0041,0050,004C	10	101	0
+drain	Ticker:byrange-D-M-	first	3	2	false
+record	Ticker:byrange-D-M-	second	0	0049,0042,004D	11	102	0
+record	Ticker:byrange-D-M-	second	1	0053,0050,0059	13	104	0
+drain	Ticker:byrange-D-M-	second	2	1	false
+drain	Ticker:byrange-D-M-	snapshot-first	0	1	false
+drops	Ticker:byrange-D-M-	initial	0	0
+size	Ticker:byrange-D-M-	replacement	2	1	2
+record	Ticker:byrange-D-M-	replacement-first	0	0053,0050,0059	13	204	0
+drain	Ticker:byrange-D-M-	replacement-first	1	1	false
+record	Ticker:byrange-D-M-	replacement-second	0	0049,0042,004D	11	202	0
+record	Ticker:byrange-D-M-	replacement-second	1	0053,0050,0059	13	204	0
+drain	Ticker:byrange-D-M-	replacement-second	2	1	false
+size	Ticker:byrange-D-M-	first-closed	2	0	2
+closed-child	Ticker:byrange-D-M-	0	0
+closed-child	Ticker:byrange-D-M-	1	0
+closed-child	Ticker:byrange-D-M-	2	0
+size	History:by1	initial	4	3	2
+record	History:by1	first	0	0041,0041,0050,004C	10	101	0
+record	History:by1	first	1	0049,0042,004D	11	102	0
+record	History:by1	first	2	004D,0053,0046,0054	12	103	0
+drain	History:by1	first	3	2	false
+record	History:by1	second	0	0049,0042,004D	11	102	0
+record	History:by1	second	1	0053,0050,0059	13	104	0
+drain	History:by1	second	2	1	false
+drain	History:by1	snapshot-first	0	1	false
+drops	History:by1	initial	0	0
+size	History:by1	replacement	4	1	2
+record	History:by1	replacement-first	0	0053,0050,0059	13	204	0
+drain	History:by1	replacement-first	1	1	false
+record	History:by1	replacement-second	0	0049,0042,004D	11	202	0
+record	History:by1	replacement-second	1	0053,0050,0059	13	204	0
+drain	History:by1	replacement-second	2	1	false
+size	History:by1	first-closed	4	0	2
+closed-child	History:by1	0	4
+size	History:byhash4	initial	4	3	2
+record	History:byhash4	first	0	0041,0041,0050,004C	10	101	0
+record	History:byhash4	first	1	0049,0042,004D	11	102	0
+record	History:byhash4	first	2	004D,0053,0046,0054	12	103	0
+drain	History:byhash4	first	3	2	false
+record	History:byhash4	second	0	0049,0042,004D	11	102	0
+record	History:byhash4	second	1	0053,0050,0059	13	104	0
+drain	History:byhash4	second	2	1	false
+drain	History:byhash4	snapshot-first	0	1	false
+drops	History:byhash4	initial	0	0
+size	History:byhash4	replacement	4	1	2
+record	History:byhash4	replacement-first	0	0053,0050,0059	13	204	0
+drain	History:byhash4	replacement-first	1	1	false
+record	History:byhash4	replacement-second	0	0049,0042,004D	11	202	0
+record	History:byhash4	replacement-second	1	0053,0050,0059	13	204	0
+drain	History:byhash4	replacement-second	2	1	false
+size	History:byhash4	first-closed	4	0	2
+closed-child	History:byhash4	0	0
+closed-child	History:byhash4	1	0
+closed-child	History:byhash4	2	0
+closed-child	History:byhash4	3	4
+size	History:byrange-D-M-	initial	4	3	2
+record	History:byrange-D-M-	first	0	0049,0042,004D	11	102	0
+record	History:byrange-D-M-	first	1	004D,0053,0046,0054	12	103	0
+record	History:byrange-D-M-	first	2	0041,0041,0050,004C	10	101	0
+drain	History:byrange-D-M-	first	3	2	false
+record	History:byrange-D-M-	second	0	0049,0042,004D	11	102	0
+record	History:byrange-D-M-	second	1	0053,0050,0059	13	104	0
+drain	History:byrange-D-M-	second	2	1	false
+drain	History:byrange-D-M-	snapshot-first	0	1	false
+drops	History:byrange-D-M-	initial	0	0
+size	History:byrange-D-M-	replacement	4	1	2
+record	History:byrange-D-M-	replacement-first	0	0053,0050,0059	13	204	0
+drain	History:byrange-D-M-	replacement-first	1	1	false
+record	History:byrange-D-M-	replacement-second	0	0049,0042,004D	11	202	0
+record	History:byrange-D-M-	replacement-second	1	0053,0050,0059	13	204	0
+drain	History:byrange-D-M-	replacement-second	2	1	false
+size	History:byrange-D-M-	first-closed	4	0	2
+closed-child	History:byrange-D-M-	0	1
+closed-child	History:byrange-D-M-	1	1
+closed-child	History:byrange-D-M-	2	2
+hint-input	byhash4	0053,0059,004D,0032	0053,0059,004D,0035
+record	byhash4	hint-only	0	0053,0059,004D,0032	10	301	0
+record	byhash4	hint-only	1	0053,0059,004D,0035	11	302	0
+drain	byhash4	hint-only	2	1	false
+record	byhash4	hint-and-filter	0	0053,0059,004D,0032	10	301	0
+drain	byhash4	hint-and-filter	1	1	false
+size	byhash4	wildcard-hint	1	1	1

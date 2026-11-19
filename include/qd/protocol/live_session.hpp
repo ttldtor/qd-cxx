@@ -20,6 +20,7 @@ class TapeEventBridge;
 struct LiveAuthorization;
 class LocalEventOwner;
 struct SharedRecordAccess;
+struct StripeEventAccess;
 } // namespace detail
 
 /** Detached counters at framing and atomic DATA-commit boundaries, before projection or fan-out. */
@@ -292,6 +293,7 @@ class LiveEvent {
     friend class detail::TapeEventBridge;
     friend class detail::LocalEventOwner;
     friend struct detail::SharedRecordAccess;
+    friend struct detail::StripeEventAccess;
     /** Adopt a fully admitted event.
      * @param state Complete owned event.
      */

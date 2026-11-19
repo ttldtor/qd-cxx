@@ -3,6 +3,7 @@
 #include "qd/protocol/live_session.hpp"
 #include "local_event_owner.hpp"
 #include "shared_record_access.hpp"
+#include "stripe_event_access.hpp"
 #include "tape_event_bridge.hpp"
 
 #include "../core/shared_record_block.hpp"
@@ -1657,9 +1658,10 @@ struct LiveEvent::State {
     LiveSnapshot snapshot;                                 ///< Independently retained immutable peer generation.
     LiveEventKind kind;                                    ///< Whole-envelope kind.
     std::shared_ptr<ReceiveRecordBatch> received;          ///< Pure network payload; wrapper release stays serialized.
-    std::optional<std::int32_t> messageType;     ///< Original message type, absent only for an empty envelope.
-    std::optional<LiveHeartbeat> heartbeat;      ///< Selected explicit type0 fields.
-    detail::PmrStreamDataResult decoded;         ///< Complete decoded owner, unpublished on failure.
+    std::size_t retainedAliasBytes = 0;      ///< Already physically charged pure receive backing retained by a slice.
+    std::optional<std::int32_t> messageType; ///< Original message type, absent only for an empty envelope.
+    std::optional<LiveHeartbeat> heartbeat;  ///< Selected explicit type0 fields.
+    detail::PmrStreamDataResult decoded;     ///< Complete decoded owner, unpublished on failure.
     std::pmr::vector<LiveFieldValueView> fields; ///< Flattened stable value views.
     std::pmr::vector<LiveRecordView> records;    ///< Stable whole-frame local record views.
     std::pmr::vector<std::shared_ptr<const core::detail::SharedRecordPayload>> sharedRows;
@@ -2867,7 +2869,7 @@ LiveSnapshot LiveEvent::snapshot() const noexcept {
 std::size_t LiveEvent::residentBytes() const noexcept {
     // Both reservations coexist in one finite ledger, so their sum is representable.
     return state_
-               ? sizeof(State) + state_->arena.capacityBytes() +
+               ? sizeof(State) + state_->arena.capacityBytes() + state_->retainedAliasBytes +
                      (state_->sharedReservation ? state_->sharedReservation->bytes : 0) +
                      (state_->received ? state_->received->arena.capacityBytes() + state_->received->controlBytes : 0)
                : 0;
@@ -2905,6 +2907,206 @@ std::size_t LiveEvent::releaseBytes() const noexcept {
 std::shared_ptr<core::detail::RecordByteState>
 detail::SharedRecordAccess::physicalState(const LiveEvent &event) noexcept {
     return event.state_ ? event.state_->ledger.lease.get()->physical().state() : nullptr;
+}
+
+std::expected<detail::StripeEventAccounting, LiveError>
+detail::StripeEventAccess::measure(const LiveEvent &source, std::span<const std::size_t> rows, StripeEventLimits limits,
+                                   LiveWork &work) {
+    try {
+        debit(1, work.operations);
+
+        if (!source.state_ || source.state_->kind != LiveEventKind::DATA) {
+            throw Error::INVALID_CONFIGURATION;
+        }
+
+        StripeEventAccounting result;
+        result.records = rows.size();
+        std::size_t previous = 0;
+
+        for (std::size_t selection = 0; selection < rows.size(); ++selection) {
+            debit(1, work.visits);
+            const auto index = rows[selection];
+
+            if (index >= source.state_->records.size() || (selection && index <= previous)) {
+                throw Error::INVALID_CONFIGURATION;
+            }
+
+            previous = index;
+            const auto &record = source.state_->records[index];
+            result.fields = sum(result.fields, record.typedValues.size());
+            result.legacyValues = sum(result.legacyValues, record.values.size());
+            debit(sum(record.values.size(), record.typedValues.size()), work.visits);
+            const auto payload = SharedRecordAccess::retain(source, record);
+
+            if (payload) {
+                result.sharedRows = true;
+                bool first = true;
+
+                for (std::size_t prior = 0; prior < selection; ++prior) {
+                    debit(1, work.visits);
+                    const auto preceding = SharedRecordAccess::retain(source, source.state_->records[rows[prior]]);
+
+                    if (preceding && preceding->batchIdentity() == payload->batchIdentity()) {
+                        first = false;
+                        break;
+                    }
+                }
+
+                if (first) {
+                    result.retainedPayloadBytes = sum(result.retainedPayloadBytes, payload->residentBytes());
+                }
+            } else {
+                debit(record.symbol.size(), work.textUnits);
+                result.copiedTextUnits = sum(result.copiedTextUnits, record.symbol.size());
+
+                for (const auto &field : record.typedValues) {
+                    if (field.units) {
+                        debit(field.units->size(), work.textUnits);
+                        result.copiedTextUnits = sum(result.copiedTextUnits, field.units->size());
+                    }
+
+                    if (field.bytes) {
+                        result.copiedOpaqueBytes = sum(result.copiedOpaqueBytes, field.bytes->size());
+                    }
+                }
+            }
+        }
+
+        result.copiedPayloadBytes =
+            sum(product(result.copiedTextUnits, sizeof(char16_t)),
+                sum(result.copiedOpaqueBytes, product(result.legacyValues, sizeof(std::int32_t))));
+        auto descriptors =
+            sum(product(result.records, sizeof(LiveRecordView)), product(result.fields, sizeof(LiveFieldValueView)));
+
+        if (result.sharedRows) {
+            descriptors = sum(
+                descriptors, product(result.records, sizeof(std::shared_ptr<const core::detail::SharedRecordPayload>)));
+        }
+
+        constexpr auto padding = alignof(LiveRecordView) + alignof(LiveFieldValueView) +
+                                 alignof(std::shared_ptr<const core::detail::SharedRecordPayload>) +
+                                 alignof(std::int32_t) + alignof(char16_t) - 5;
+        result.metadataBytes = sum(sizeof(LiveEvent::State), sum(descriptors, padding));
+
+        if (result.metadataBytes > limits.metadataBytes || result.copiedPayloadBytes > limits.copiedPayloadBytes ||
+            result.retainedPayloadBytes > limits.retainedPayloadBytes) {
+            throw Error::RESOURCE_LIMIT;
+        }
+
+        debit(sum(result.metadataBytes, result.copiedPayloadBytes), work.bytes);
+
+        return result;
+    } catch (Error error) {
+        return std::unexpected(error);
+    }
+}
+
+std::expected<LiveEvent, LiveError> detail::StripeEventAccess::select(const LiveEvent &source,
+                                                                      std::span<const std::size_t> rows,
+                                                                      StripeEventLimits limits, LiveWork &work) {
+    const auto measured = measure(source, rows, limits, work);
+
+    if (!measured) {
+        return std::unexpected(measured.error());
+    }
+
+    try {
+        debit(sum(rows.size(), sum(measured->fields, measured->legacyValues)), work.visits);
+        const auto bytes = sum(measured->metadataBytes - sizeof(LiveEvent::State), measured->copiedPayloadBytes);
+        auto &storage = *source.state_->ledger.lease.get();
+        auto result = makeOwner<LiveEvent::State>(storage, bytes, source.state_->snapshot, LiveEventKind::DATA);
+        result->messageType = source.state_->messageType;
+        result->heartbeat = source.state_->heartbeat;
+        result->records.reserve(rows.size());
+        result->fields.reserve(measured->fields);
+
+        if (measured->sharedRows) {
+            result->sharedRows.reserve(rows.size());
+
+            if (source.state_->sharedReservation) {
+                result->sharedReservation.emplace(storage, measured->retainedPayloadBytes);
+            } else {
+                // Receive backing already owns its physical reservation in this same epoch domain.
+                result->retainedAliasBytes = measured->retainedPayloadBytes;
+            }
+        }
+
+        auto *resource = result->arena.resource();
+        auto *values = measured->legacyValues
+                           ? static_cast<std::int32_t *>(resource->allocate(
+                                 product(measured->legacyValues, sizeof(std::int32_t)), alignof(std::int32_t)))
+                           : nullptr;
+
+        auto *text = measured->copiedTextUnits
+                         ? static_cast<char16_t *>(resource->allocate(
+                               product(measured->copiedTextUnits, sizeof(char16_t)), alignof(char16_t)))
+                         : nullptr;
+        auto *opaque =
+            measured->copiedOpaqueBytes
+                ? static_cast<std::byte *>(resource->allocate(measured->copiedOpaqueBytes, alignof(std::byte)))
+                : nullptr;
+        const auto copyText = [&text](std::u16string_view input) {
+            if (input.empty()) {
+                return std::u16string_view(u"");
+            }
+
+            const std::u16string_view output(text, input.size());
+            text = std::uninitialized_copy(input.begin(), input.end(), text);
+
+            return output;
+        };
+
+        for (const auto index : rows) {
+            const auto &record = source.state_->records[index];
+            const auto payload = SharedRecordAccess::retain(source, record);
+            const auto first = result->fields.size();
+
+            for (const auto &field : record.typedValues) {
+                auto copied = field;
+
+                if (!payload && field.units) {
+                    copied.units = copyText(*field.units);
+                }
+
+                if (!payload && field.bytes) {
+                    copied.bytes = std::span<const std::byte>{};
+
+                    if (!field.bytes->empty()) {
+                        copied.bytes = std::span<const std::byte>(opaque, field.bytes->size());
+                        opaque = std::uninitialized_copy(field.bytes->begin(), field.bytes->end(), opaque);
+                    }
+                }
+
+                result->fields.push_back(copied);
+            }
+
+            auto copied = record;
+            copied.symbol = payload ? payload->symbol() : copyText(record.symbol);
+            copied.values = {};
+            copied.typedValues = std::span(result->fields).subspan(first, record.typedValues.size());
+
+            if (!record.values.empty()) {
+                copied.values = std::span<const std::int32_t>(values, record.values.size());
+                values = std::uninitialized_copy(record.values.begin(), record.values.end(), values);
+            }
+
+            result->records.push_back(copied);
+
+            if (measured->sharedRows) {
+                result->sharedRows.push_back(payload);
+            }
+        }
+
+        return LiveEvent(std::move(result));
+    } catch (Error error) {
+        return std::unexpected(error);
+    } catch (const LiveStorageLimit &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    } catch (const std::bad_alloc &) {
+        return std::unexpected(Error::ALLOCATION_FAILURE);
+    } catch (const std::length_error &) {
+        return std::unexpected(Error::RESOURCE_LIMIT);
+    }
 }
 
 LivePendingOutput::LivePendingOutput(std::unique_ptr<State> state) noexcept : state_(std::move(state)) {
