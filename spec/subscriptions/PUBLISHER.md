@@ -1,6 +1,6 @@
 # QTP publishing and relay
 
-[Русская версия](PUBLISHER.ru.md). English is authoritative.
+[Русская версия](PUBLISHER.ru.md) · [Server trust and resource boundaries](../transport/SERVER-TRUST-BOUNDARIES.md). English is authoritative.
 
 `qd/api/publisher.hpp` is installed with `qdcxx::feed`. Create a `RuntimeBootstrap` on the main thread before other application threads, then create a `PublisherEndpoint` from it. Keep the bootstrap alive until the endpoint and any receiving `ApiRuntime` using it are destroyed. The endpoint owns one worker and its listening socket. It returns the selected port after the worker binds. Each receiving Feed endpoint connects on an independent TCP connection in the ordinary TICKER profile.
 

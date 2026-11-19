@@ -1,6 +1,6 @@
 # Публикация и ретрансляция QTP
 
-[English version](PUBLISHER.md). Нормативная версия на английском.
+[English version](PUBLISHER.md) · [Серверные границы доверия и ресурсов](../transport/SERVER-TRUST-BOUNDARIES.ru.md). Нормативная версия на английском.
 
 `qd/api/publisher.hpp` устанавливается с `qdcxx::feed`. Создайте `RuntimeBootstrap` на главном потоке перед запуском других потоков приложения, затем создайте `PublisherEndpoint`. Bootstrap должен жить дольше endpoint и использующих его экземпляров `ApiRuntime`. Endpoint владеет одним рабочим потоком и слушающим сокетом. После привязки сокета он возвращает фактический порт. Каждый принимающий endpoint Feed подключается в обычном режиме TICKER по отдельному TCP-соединению.
 
