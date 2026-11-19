@@ -190,6 +190,27 @@ Successful operations transfer their scratch chunk to caller and release tempora
 Cumulative work charges survive failure; committed output/frame counters change only on
 whole operation success. Diagnostics distinguish these counters.
 
+These limits measure different things: `records` counts attempted description IDs
+and data records, `frameBytes` bounds one body including its message ID, and
+`outputBytes` counts committed envelopes including length prefixes. `workUnits` is
+a cumulative charge for logical work, not a byte or record limit. One large
+record can exceed `frameBytes` even when the record allowance remains. A `data()`
+call produces one complete chunk and does not split the input: excess body bytes
+fail with RESOURCE_LIMIT / `frame-bytes`. Work and record attempts already charged
+remain; the failed operation commits neither a frame nor output bytes and leaves
+the writer FAILED with its first diagnostic.
+
+Checked size addition overflow fails with RESOURCE_LIMIT / `size-arithmetic`;
+a representable body above the signed compact-length range fails with
+RESOURCE_LIMIT / `frame-size` if the earlier frame-byte check permits it. These
+are writer operation failures; reader configuration and input-offset overflow
+have the separate outcomes in [FRAMING](FRAMING.md).
+
+Chunks are composed without I/O. A caller handling a partially written chunk must
+retain and resume its unwritten suffix according to its sink's contract. For the
+owned transport slot, see [BYTE-OWNER](../transport/BYTE-OWNER.md); local byte
+acceptance does not establish peer receipt.
+
 Use subtraction-before-addition for counters and checked representability for encoded
 lengths. Before every traversal/allocation check its relevant remaining allowance. Operation
 order is state; operation/group/record count budget; each element's structural/profile checks

@@ -89,6 +89,13 @@ in `maxFrameBytes`. The publisher can combine records from several ready
 input groups in one delivery window. It leaves promptly when there are no
 ready records or the current work budget is exhausted.
 
+The pending-row count, retained input bytes, delivery-window bytes and encoded
+frame bytes measure separate resources. A work budget accounts for processing
+steps within one turn. The number of records that fit within a byte budget
+depends on their retained or encoded sizes; a record-count quota is a separate
+setting. The body limit on the receiving framer excludes
+the length prefix, unlike `maxFrameBytes`; see [FRAMING](../protocol/FRAMING.md).
+
 The source-row quota and charged byte capacity remain independently bounded. Per-peer
 STREAM arenas are charged at their measured allocation size. The bytes of
 complete rows and the available queue data determine frame size. A frame
