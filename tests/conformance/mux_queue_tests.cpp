@@ -1,6 +1,9 @@
 // Copyright (c) 2026 ttldtor.
 // SPDX-License-Identifier: BSL-1.0
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#ifdef ORG_TTLDTOR_QDCXX_MUX_QUEUE_HAS_FEED
+#    include "../../src/api/publisher_delivery.hpp"
+#endif
 #include "../../src/core/delivery_statistics.hpp"
 #include "../../src/core/shared_record_block.hpp"
 #include "../../src/events/derived_order_sources.hpp"
@@ -134,9 +137,10 @@ std::vector<std::byte> frame(std::int32_t type, std::span<const std::byte> paylo
 }
 
 /** Prepare modern peer capability metadata, without clocks or sockets.
- * @return Canonical DESCRIBE_PROTOCOL frame advertising STREAM_DATA.
+ * @param duplex Also admit DATA output to the peer for deterministic publisher composition.
+ * @return Canonical DESCRIBE_PROTOCOL frame advertising all three DATA families.
  */
-std::vector<std::byte> ready() {
+std::vector<std::byte> ready(bool duplex = false) {
     std::vector<std::byte> payload{std::byte{'D'}, std::byte{'X'}, std::byte{'P'}, std::byte{'3'}};
     number(payload, 0);
     number(payload, 3);
@@ -149,7 +153,18 @@ std::vector<std::byte> ready() {
     number(payload, 20);
     text(payload, u"HISTORY_DATA");
     number(payload, 0);
-    number(payload, 0);
+    number(payload, duplex ? 3 : 0);
+
+    if (duplex) {
+        constexpr std::array<std::pair<std::int32_t, std::u16string_view>, 3> messages{
+            {{10, u"TICKER_DATA"}, {15, u"STREAM_DATA"}, {20, u"HISTORY_DATA"}}};
+
+        for (const auto &[id, name] : messages) {
+            number(payload, id);
+            text(payload, name);
+            number(payload, 0);
+        }
+    }
 
     return frame(1, payload);
 }
@@ -238,13 +253,14 @@ p::LiveEvent admit(p::LiveSession &session, std::span<const std::byte> bytes) {
 /** Prepare a real epoch using the selected local schema identity.
  * @param source Immutable schema, copied with preserved provenance for transfer.
  * @param bounds Explicit actual admission profile, including the large quantum case.
- * @return Ready native live session with both complete sender descriptions.
+ * @param publisherIds Use outgoing local IDs0/1 and leave incoming descriptions to the real peer.
+ * @return Ready native session; ordinary sparse source sessions include their incoming descriptions.
  */
-p::LiveSession session(const c::LocalSchema &source, p::LiveLimits bounds = liveLimits()) {
+p::LiveSession session(const c::LocalSchema &source, p::LiveLimits bounds = liveLimits(), bool publisherIds = false) {
     auto copied = source;
     const p::OutgoingRecord declarations[]{
-        {41, 0, u"Oracle#ONE", {{u"TimeHigh", 8, 0}, {u"TimeLow", 8, 1}, {u"Value", 8, 2}}},
-        {7, 1, u"Oracle#TWO", {{u"TimeHigh", 8, 0}, {u"TimeLow", 8, 1}, {u"Value", 8, 2}}}};
+        {publisherIds ? 0 : 41, 0, u"Oracle#ONE", {{u"TimeHigh", 8, 0}, {u"TimeLow", 8, 1}, {u"Value", 8, 2}}},
+        {publisherIds ? 1 : 7, 1, u"Oracle#TWO", {{u"TimeHigh", 8, 0}, {u"TimeLow", 8, 1}, {u"Value", 8, 2}}}};
     p::SubscriptionWriterWork writerWork{10000, 1000000, 1000000, 1000000};
     auto writer = p::SubscriptionWriter::create(source, declarations, {{16, 128, 256, 128, 16384}, 16, 128, 128, 16384},
                                                 {8192, 8201, 512, 1024, {8192, 1024}, 65536, 65536, 128}, writerWork);
@@ -253,8 +269,11 @@ p::LiveSession session(const c::LocalSchema &source, p::LiveLimits bounds = live
     auto result = p::LiveSession::create(std::move(copied), std::move(*writer), bounds, work);
     REQUIRE(result);
     (void)admit(*result, ready());
-    (void)admit(*result, description(41, 0));
-    (void)admit(*result, description(7, 1));
+
+    if (!publisherIds) {
+        (void)admit(*result, description(41, 0));
+        (void)admit(*result, description(7, 1));
+    }
 
     return std::move(*result);
 }
@@ -619,6 +638,225 @@ TEST_CASE("grouped replacement leaves all queue revisions and mappings intact on
     }
 
     CHECK(statistics->snapshot().activeDesiredRevision == 1);
+}
+
+#ifdef ORG_TTLDTOR_QDCXX_MUX_QUEUE_HAS_FEED
+TEST_CASE("publisher delivery revokes held and unstarted TICKER and STREAM frames deterministically") {
+    namespace a = org::ttldtor::qdcxx::api;
+
+    for (const auto family : {c::SubscriptionFamily::TICKER, c::SubscriptionFamily::STREAM}) {
+        SUBCASE(family == c::SubscriptionFamily::TICKER ? "TICKER" : "STREAM") {
+            auto f = fixture(family);
+            auto delivery = std::make_shared<a::detail::Delivery>();
+            auto work = turn();
+            auto opened = f.queue.open(clientLimits(), delivery, work);
+            REQUIRE(opened);
+            auto handle = std::move(*opened);
+            const c::SubscriptionRequest requests[]{{{f.schema.recordContext(0), u"ALPHA"}, {}},
+                                                    {{f.schema.recordContext(0), u"BETA"}, {}},
+                                                    {{f.schema.recordContext(0), u"GAMMA"}, {}}};
+            auto submit = submitTurn();
+            const auto added = handle.add(requests, submit);
+            REQUIRE(added);
+            until(f, [&] {
+                return added->result().has_value();
+            });
+            REQUIRE(added->result()->status == m::CommandStatus::APPLIED);
+            until(f, [&] {
+                return handle.state() == m::QueueClientState::ACTIVE;
+            });
+            send(f, {{0, u"ALPHA", 1, 10}, {0, u"BETA", 1, 20}, {0, u"GAMMA", 1, 30}}, true);
+            constexpr unsigned MAX_ROUTE_TURNS = 100;
+
+            for (unsigned i = 0; i < MAX_ROUTE_TURNS && f.queue.resources(handle)->queuedRecords != 3; ++i) {
+                work = turn();
+                REQUIRE(f.queue.progressWithoutCallbacks(work));
+            }
+
+            REQUIRE(f.queue.resources(handle)->queuedRecords == 3);
+            REQUIRE(delivery->batch.records().empty());
+            until(f, [&] {
+                return delivery->batch.records().size() == 3;
+            });
+            REQUIRE(delivery->cursor == 0);
+            REQUIRE(delivery->batch.records()[1].symbol == u"BETA");
+
+            auto sender = session(f.schema, liveLimits(), true);
+            auto receiver = session(f.schema, liveLimits(), true);
+            (void)admit(sender, ready(true));
+            auto protocolWork = liveTurn();
+            constexpr std::int32_t OUTPUT_IDS[]{0, 1};
+            auto described = sender.describe(OUTPUT_IDS, protocolWork);
+            REQUIRE(described);
+            (void)admit(receiver, described->bytes());
+            described = std::unexpected(p::LiveError::NONE);
+            a::EventRegistryWork registryWork;
+            const auto registry = a::EventRegistry::builtIn({}, registryWork);
+            REQUIRE(registry);
+            const std::optional<a::FeedFilter> replacementPolicy =
+                a::FeedFilter::Builder(*registry).withCategory(u"permitted", u":Oracle#ONE&(ALPHA,GAMMA)").build();
+            CHECK(a::detail::publisherRecordAllowed(replacementPolicy, f.schema, f.schema.recordContext(0), u"ALPHA"));
+            CHECK_FALSE(
+                a::detail::publisherRecordAllowed(replacementPolicy, f.schema, f.schema.recordContext(0), u"BETA"));
+            CHECK_FALSE(
+                a::detail::publisherRecordAllowed(replacementPolicy, f.schema, f.schema.recordContext(1), u"ALPHA"));
+            std::optional<p::LivePendingOutput> pending;
+            auto kind = a::detail::OutputKind::DATA;
+            std::size_t outputFamily = family == c::SubscriptionFamily::TICKER ? 0 : 1;
+            std::size_t outputEnd = 0;
+            std::size_t outputCount = 0;
+            const a::detail::DeliveryOutputView output{pending, kind, outputFamily, outputEnd, outputCount};
+            std::array<p::LiveDataRecordView, 4> outgoing;
+            std::optional<a::PublisherStreamByteLimits> streamBytes;
+            bool prefixWritten = false;
+            bool partialWritten = false;
+            bool preservePrefix = false;
+            SUBCASE("held tail after a fully written allowed prefix") {
+                prefixWritten = true;
+            }
+            SUBCASE("unaffected composed prefix survives revocation of the held tail") {
+                preservePrefix = true;
+            }
+            SUBCASE("composed frame has not started writing") {
+            }
+            SUBCASE("composed byte-bounded STREAM frame has not started writing") {
+                if (family == c::SubscriptionFamily::STREAM)
+                    streamBytes = a::PublisherStreamByteLimits{};
+            }
+            SUBCASE("partially written revoked frame requires retirement") {
+                partialWritten = true;
+            }
+            std::vector<std::int64_t> delivered;
+            std::vector<std::u16string> symbols;
+            const auto writeWholeFrame = [&] {
+                REQUIRE(pending);
+                REQUIRE(pending->pendingBytes().size() == pending->bytes().size());
+                const auto event = admit(receiver, pending->pendingBytes());
+
+                for (const auto &record : event.records()) {
+                    REQUIRE(record.typedValues.size() == 3);
+                    delivered.push_back(record.typedValues[2].raw);
+                    symbols.emplace_back(record.symbol);
+                }
+
+                REQUIRE(pending->consume(pending->pendingBytes().size()));
+                pending.reset();
+                delivery->cursor = outputEnd;
+                a::detail::releaseSuppressedPrefix(*delivery, handle);
+            };
+            const auto compose = [&](std::size_t rows) {
+                auto liveWork = liveTurn();
+                auto frame = a::detail::composeDelivery(*delivery, output, sender, outputFamily, f.schema, streamBytes,
+                                                        std::span(outgoing).first(rows), liveWork);
+                REQUIRE(frame);
+                pending = std::move(*frame);
+            };
+            compose(prefixWritten || preservePrefix ? 1 : outgoing.size());
+
+            if (prefixWritten) {
+                REQUIRE(outputCount == 1);
+                writeWholeFrame();
+                REQUIRE(delivery->cursor == 1);
+            } else {
+                REQUIRE(outputCount == (preservePrefix ? 1 : 3));
+            }
+
+            a::detail::DeliveryMask revoked;
+            a::detail::collectDeliveryRevocations(*delivery, replacementPolicy, f.schema, revoked);
+            REQUIRE(revoked.count() == 1);
+            REQUIRE(revoked[1]);
+
+            if (partialWritten) {
+                REQUIRE(pending->consume(1));
+                const auto suffix = pending->pendingBytes().size();
+                CHECK(a::detail::revokesPartialOutput(output, *delivery, outputFamily, revoked));
+                CHECK(pending->pendingBytes().size() == suffix);
+                CHECK_FALSE(delivery->suppressed.any());
+                // The worker retires this peer at this decision; no suffix is written or recomposed.
+                continue;
+            }
+
+            CHECK_FALSE(a::detail::revokesPartialOutput(output, *delivery, outputFamily, revoked));
+            work = turn();
+            const c::SubscriptionRequest effective[]{requests[0], requests[2]};
+            const m::detail::QueueReplacement replacement{&f.queue, &handle, effective, &work};
+            REQUIRE(m::detail::QueueReplaceAccess::replace(std::span(&replacement, 1), 2, 1));
+            a::detail::applyDeliveryRevocation(*delivery, handle, output, outputFamily, revoked);
+            CHECK(delivery->suppressed[1]);
+
+            if (preservePrefix) {
+                REQUIRE(pending);
+                writeWholeFrame();
+                REQUIRE(delivery->cursor == 2);
+            }
+
+            REQUIRE_FALSE(pending);
+            compose(outgoing.size());
+            CHECK(outputCount == (prefixWritten || preservePrefix ? 1 : 2));
+            CHECK(outputEnd == 3);
+            writeWholeFrame();
+            CHECK(delivered == std::vector<std::int64_t>{10, 30});
+            CHECK(symbols == std::vector<std::u16string>{u"ALPHA", u"GAMMA"});
+            CHECK(delivery->batch.records().empty());
+            CHECK(delivery->cursor == 0);
+            CHECK_FALSE(delivery->suppressed.any());
+        }
+    }
+}
+
+#endif
+
+TEST_CASE("grouped filter replacement removes forbidden queued TICKER and STREAM tails") {
+    for (const auto family : {c::SubscriptionFamily::TICKER, c::SubscriptionFamily::STREAM}) {
+        CAPTURE(family);
+        auto f = fixture(family);
+        auto changed = std::make_shared<Recorder>();
+        auto keeper = std::make_shared<Recorder>();
+        auto selected = open(f, changed);
+        auto independent = open(f, keeper);
+        const c::SubscriptionRequest requested[]{{{f.schema.recordContext(0), u"ALPHA"}, {}},
+                                                 {{f.schema.recordContext(1), u"BETA"}, {}}};
+
+        for (auto *handle : {&selected, &independent}) {
+            auto submit = submitTurn();
+            const auto ticket = handle->add(requested, submit);
+            REQUIRE(ticket);
+            until(f, [&] {
+                return ticket->result().has_value();
+            });
+            REQUIRE(ticket->result()->status == m::CommandStatus::APPLIED);
+            until(f, [&] {
+                return handle->state() == m::QueueClientState::ACTIVE;
+            });
+        }
+
+        send(f, {{0, u"ALPHA", 1, 10}, {1, u"BETA", 1, 20}}, true);
+        constexpr unsigned MAX_ROUTE_TURNS = 100;
+
+        for (unsigned i = 0; i < MAX_ROUTE_TURNS && (f.queue.resources(selected)->queuedRecords != 2 ||
+                                                     f.queue.resources(independent)->queuedRecords != 2);
+             ++i) {
+            auto work = turn();
+            REQUIRE(f.queue.progressWithoutCallbacks(work));
+        }
+
+        REQUIRE(f.queue.resources(selected)->queuedRecords == 2);
+        REQUIRE(f.queue.resources(independent)->queuedRecords == 2);
+        REQUIRE(changed->values.empty());
+        REQUIRE(keeper->values.empty());
+        auto work = turn();
+        const m::detail::QueueReplacement replacement{&f.queue, &selected, std::span(requested).last(1), &work};
+        REQUIRE(m::detail::QueueReplaceAccess::replace(std::span(&replacement, 1), 1, 1));
+        CHECK(changed->values.empty());
+        CHECK(f.queue.resources(independent)->queuedRecords == 2);
+        until(f, [&] {
+            return changed->values.size() == 1 && keeper->values.size() == 2;
+        });
+        CHECK(changed->values == std::vector<std::int64_t>{20});
+        CHECK(keeper->values == std::vector<std::int64_t>{10, 20});
+        CHECK(f.queue.resources(selected)->queuedRecords == 0);
+        CHECK(f.queue.resources(independent)->queuedRecords == 0);
+    }
 }
 
 TEST_CASE("delivery statistics publish command qualified selectors only after actual mapping commit") {

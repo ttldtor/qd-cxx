@@ -18,6 +18,7 @@
 #include <asio/io_context.hpp>
 #include <asio/ip/tcp.hpp>
 #include <asio/write.hpp>
+#include <atomic>
 #include <condition_variable>
 #include <doctest/doctest.h>
 #include <limits>
@@ -725,6 +726,132 @@ TEST_CASE("publisher applies per-address physical demand policy before upstream 
     const auto duplicate = q::api::PublisherEndpoint::create(*bootstrap, std::move(relayOptions));
     REQUIRE_FALSE(duplicate);
     CHECK(duplicate.error().code == q::api::ErrorCode::INVALID_ARGUMENT);
+}
+
+TEST_CASE("explicit dynamic policy generations reconcile only effective upstream demand") {
+    auto bootstrap = q::transport::RuntimeBootstrap::create();
+    REQUIRE(bootstrap);
+    q::api::EventRegistryWork work;
+    const auto registry = q::api::EventRegistry::builtIn({}, work);
+    REQUIRE(registry);
+    const auto deny = q::api::FeedFilter::Builder(*registry).withCategory(u"deny", u":Other").build();
+    const auto ready = q::api::FeedFilter::Builder(*registry).withCategory(u"ready", u":Quote&READY").build();
+    q::api::PublisherOptions sourceOptions;
+    sourceOptions.mixed = true;
+    auto source = q::api::PublisherEndpoint::create(*bootstrap, sourceOptions);
+    requireServer(source);
+    q::api::PublisherOptions relayOptions;
+    relayOptions.mixed = true;
+    relayOptions.source = q::api::PublisherSourceOptions{"127.0.0.1", (*source)->port()};
+    relayOptions.peerDemand.push_back({"127.0.0.1", {ready, deny, deny}});
+    auto relay = q::api::PublisherEndpoint::create(*bootstrap, relayOptions);
+    requireServer(relay);
+    DemandPeer changing((*relay)->port(), asio::ip::make_address_v4("127.0.0.1"));
+    DemandPeer keeper((*relay)->port(), asio::ip::make_address_v4("127.0.0.2"));
+    using enum q::core::SubscriptionFamily;
+    using enum q::protocol::SubscriptionMessage;
+    changing.subscribeBoth(TICKER_ADD, 0, u"IBM", u"MSFT");
+    changing.subscribeBoth(STREAM_ADD, 1, u"IBM", u"MSFT");
+    changing.subscribe(HISTORY_ADD, 2, u"IBM", -40);
+    changing.subscribe(HISTORY_ADD, 2, u"MSFT", -20);
+    changing.subscribe(TICKER_ADD, 0, u"READY");
+    keeper.subscribe(HISTORY_ADD, 2, u"IBM", -10);
+    REQUIRE((*source)->awaitDemand(TICKER, u"Quote", u"READY", true, Clock::now() + 5s));
+    REQUIRE((*source)->awaitDemand(HISTORY, u"Order", u"IBM", true, Clock::now() + 5s));
+
+    const auto peers = (*relay)->getPeers();
+    const auto selected = std::ranges::find_if(peers, [](const auto &peer) {
+        return peer.address.back() == 1;
+    });
+    REQUIRE(selected != peers.end());
+    const auto replace = [&](const q::api::FeedFilter &generation, std::uint64_t revision) {
+        const auto ticket = (*relay)->replacePeerDemand(selected->id, {generation, generation, generation});
+        REQUIRE(ticket);
+        const auto outcome = ticket->waitUntil(Clock::now() + 5s);
+        REQUIRE(outcome);
+        CHECK(outcome->outcome == q::api::PublisherPolicyOutcome::APPLIED);
+        CHECK(outcome->revision == revision);
+    };
+    const auto requireKeys = [&](std::u16string_view symbol) {
+        REQUIRE((*source)->awaitDemand(TICKER, u"Quote", symbol, true, Clock::now() + 5s));
+        REQUIRE((*source)->awaitDemand(STREAM, u"TimeAndSale", symbol, true, Clock::now() + 5s));
+        REQUIRE((*source)->awaitDemand(HISTORY, u"Order", symbol, true, Clock::now() + 5s));
+    };
+    const auto requireHistoryBound = [&](std::u16string_view symbol, std::int64_t bound) {
+        const auto deadline = Clock::now() + 5s;
+
+        while (Clock::now() < deadline) {
+            const auto demand = (*source)->getDemand(HISTORY);
+            const auto entry = std::ranges::find(demand, symbol, &q::api::PublisherDemand::symbol);
+
+            if (entry != demand.end() && entry->historyBound == bound)
+                return;
+
+            std::this_thread::sleep_for(1ms);
+        }
+
+        FAIL("effective HISTORY bound did not reach the source");
+    };
+
+    auto context = q::api::FeedFilterContext::create();
+    const std::u16string resource = u"ipf[file:/publisher-policy.ipf,update=1m]";
+    const std::u16string initialSymbols[]{u"IBM"};
+    context->replaceSymbols(resource, initialSymbols, true);
+    const auto initial =
+        q::api::FeedFilter::Builder(*registry).withResourceContext(context).withCategory(u"symbols", resource).build();
+    auto tracker = initial.getTracker();
+    const auto notifications = std::make_shared<std::atomic_size_t>(0);
+    const auto listener = tracker.addListener([notifications](q::api::FeedFilterTracker) {
+        notifications->fetch_add(1, std::memory_order_relaxed);
+    });
+    REQUIRE(listener != 0);
+    replace(initial, 1);
+    requireKeys(u"IBM");
+    requireHistoryBound(u"IBM", -40);
+    REQUIRE((*source)->awaitDemand(TICKER, u"Quote", u"READY", false, Clock::now() + 5s));
+    CHECK((*source)->getDemand(TICKER).size() == 1);
+    CHECK((*source)->getDemand(STREAM).size() == 1);
+    REQUIRE((*source)->getDemand(HISTORY).size() == 1);
+    CHECK((*source)->getDemand(HISTORY).front().historyBound == -40);
+
+    const std::u16string nextSymbols[]{u"MSFT"};
+    context->replaceSymbols(resource, nextSymbols, true);
+    CHECK(notifications->load(std::memory_order_relaxed) == 1);
+    const auto current = tracker.getCurrentFilter();
+    CHECK(initial.accept(q::api::EventType::QUOTE, q::api::SubscriptionSelector::plain(u"IBM")));
+    CHECK_FALSE(current.accept(q::api::EventType::QUOTE, q::api::SubscriptionSelector::plain(u"IBM")));
+
+    // Obtaining a tracker generation does not commit a publisher policy transaction.
+    for (const auto family : {TICKER, STREAM, HISTORY}) {
+        const auto demand = (*relay)->getDemand(family);
+        REQUIRE(demand.size() == 1);
+        CHECK(demand.front().symbol == u"IBM");
+    }
+
+    replace(current, 2);
+    requireKeys(u"MSFT");
+    requireHistoryBound(u"IBM", -10);
+    requireHistoryBound(u"MSFT", -20);
+    REQUIRE((*source)->awaitDemand(TICKER, u"Quote", u"IBM", false, Clock::now() + 5s));
+    REQUIRE((*source)->awaitDemand(STREAM, u"TimeAndSale", u"IBM", false, Clock::now() + 5s));
+    const auto history = (*source)->getDemand(HISTORY);
+    REQUIRE(history.size() == 2);
+    const auto ibm = std::ranges::find(history, std::u16string_view(u"IBM"), &q::api::PublisherDemand::symbol);
+    REQUIRE(ibm != history.end());
+    CHECK(ibm->historyBound == -10);
+    const auto msft = std::ranges::find(history, std::u16string_view(u"MSFT"), &q::api::PublisherDemand::symbol);
+    REQUIRE(msft != history.end());
+    CHECK(msft->historyBound == -20);
+
+    keeper.subscribe(HISTORY_REMOVE, 2, u"IBM");
+    REQUIRE((*source)->awaitDemand(HISTORY, u"Order", u"IBM", false, Clock::now() + 5s));
+    replace(deny, 3);
+    REQUIRE((*source)->awaitDemand(TICKER, u"Quote", u"MSFT", false, Clock::now() + 5s));
+    REQUIRE((*source)->awaitDemand(STREAM, u"TimeAndSale", u"MSFT", false, Clock::now() + 5s));
+    REQUIRE((*source)->awaitDemand(HISTORY, u"Order", u"MSFT", false, Clock::now() + 5s));
+    CHECK((*relay)->getDiagnostic().code == q::api::ErrorCode::NONE);
+    CHECK((*source)->getDiagnostic().code == q::api::ErrorCode::NONE);
+    CHECK(tracker.removeListener(listener));
 }
 
 TEST_CASE("publisher rejects an entire over-bound filter batch without retiring other peers") {
