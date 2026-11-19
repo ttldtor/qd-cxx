@@ -19,6 +19,7 @@ param(
     [switch]$HelpRu,
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ProducerNamespace,
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ReceiverNamespace,
+    [ValidateRange(10, 10000)][int]$SampleIntervalMs = 100,
     [switch]$TcpNoDelay
 )
 
@@ -30,6 +31,7 @@ if ($HelpRu) {
     Write-Output ' -Duration 10 (1..300 с), -Repeats 1 (1..10), -Pacing sleep или yield (по умолчанию sleep),'
     Write-Output ' -ListenAddress 127.0.0.1 (конкретный числовой IPv4). Несколько режимов Pacing передаются массивом.'
     Write-Output ' На Linux можно указать -ProducerNamespace ИМЯ -ReceiverNamespace ИМЯ и IPv4 интерфейса издателя.'
+    Write-Output ' -SampleIntervalMs 100 (10..10000 мс) задаёт интервал опроса процессов и потоков.'
     Write-Output ' -TcpNoDelay включает TCP_NODELAY у издателя.'
     Write-Output 'Rate * Duration и пакет должны помещаться в 22-битную последовательность. Нужны JDK с javac и QD 3.357.'
     Write-Output 'Создаёт каталог с summary.csv, JSON, процессными замерами и журналами каждого прогона. Создаёт процессы и TCP-сокеты.'
@@ -43,6 +45,7 @@ if ($Help -or !$PSBoundParameters.Count) {
     Write-Output ' -Duration 10 (1..300 s), -Repeats 1 (1..10), -Pacing sleep or yield (default sleep),'
     Write-Output ' -ListenAddress 127.0.0.1 (concrete numeric IPv4). Multiple Pacing values may be passed as an array.'
     Write-Output ' On Linux, supply -ProducerNamespace NAME -ReceiverNamespace NAME and the publisher interface IPv4 address.'
+    Write-Output ' -SampleIntervalMs 100 (10..10000 ms) controls live process/thread sampling.'
     Write-Output ' -TcpNoDelay enables TCP_NODELAY on the publisher.'
     Write-Output 'Rate * Duration and batch must fit the 22-bit sequence range. A JDK with javac and QD 3.357 are required.'
     Write-Output 'Creates a directory containing summary.csv and each run''s JSON, process samples and logs. Starts processes and TCP sockets.'
@@ -123,6 +126,7 @@ foreach ($repeat in 1..$Repeats) {
                     ListenAddress = $ListenAddress
                     Precision = 'ns'
                     Pacing = $mode
+                    SampleIntervalMs = $SampleIntervalMs
                     TcpNoDelay = [bool]$TcpNoDelay
                 }
                 if ($ProducerNamespace) {
@@ -161,6 +165,9 @@ foreach ($repeat in 1..$Repeats) {
                     $receiverPeakWorkingSetBytes += [long]$process.sampledPeakWorkingSetBytes
                     $receiverPeakPrivateBytes += [long]$process.sampledPeakPrivateBytes
                 }
+                if (@($processes | Where-Object { $null -eq $_.userCpuSeconds -or $null -eq $_.systemCpuSeconds }).Count) { $receiverCpuSeconds = $null }
+                if (@($processes | Where-Object { $null -eq $_.sampledPeakWorkingSetBytes }).Count) { $receiverPeakWorkingSetBytes = $null }
+                if (@($processes | Where-Object { $null -eq $_.sampledPeakPrivateBytes }).Count) { $receiverPeakPrivateBytes = $null }
                 $rows.Add([pscustomobject]@{
                     run = $name
                     repeat = $repeat
@@ -178,14 +185,15 @@ foreach ($repeat in 1..$Repeats) {
                     sentDataFrames = $result.sender.sentFrames
                     dataFramesPerDeliveredRecord = $result.sender.sentFrames / $delivered
                     worstClientP95Ns = ($receivers | Measure-Object -Property latencyP95Ns -Maximum).Maximum
-                    producerCpuSeconds = $producer.userCpuSeconds + $producer.systemCpuSeconds
+                    producerCpuSeconds = if ($null -ne $producer.userCpuSeconds -and $null -ne $producer.systemCpuSeconds) { $producer.userCpuSeconds + $producer.systemCpuSeconds } else { $null }
                     receiverCpuSecondsSum = $receiverCpuSeconds
                     producerPeakWorkingSetBytes = $producer.sampledPeakWorkingSetBytes
                     receiverPeakWorkingSetBytesSum = $receiverPeakWorkingSetBytes
                     producerPeakPrivateBytes = $producer.sampledPeakPrivateBytes
                     receiverPeakPrivateBytesSum = $receiverPeakPrivateBytes
                 })
-                $rows | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $output 'summary.csv')
+                . (Join-Path $PSScriptRoot 'MetricsExport.ps1')
+                Export-InvariantMetricCsv $rows (Join-Path $output 'summary.csv')
             }
         }
     }

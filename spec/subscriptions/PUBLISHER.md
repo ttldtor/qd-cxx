@@ -152,7 +152,7 @@ each publication's queue node/shared control, packed descriptors, source metadat
 and block control. `rowBytes` continues to bound one row's logical field descriptors, symbol and variable
 payload. A budget too small for the fixed binding is rejected at endpoint creation. A complete request whose bytes or row count
 cannot fit an empty input domain reports `RESOURCE_LIMIT` at `publisher-publication-capacity`;
-temporary occupancy reports `publisher-pending-records`. The legacy typed profile derives a finite byte
+Temporary byte occupancy reports `publisher-pending-records`; row-quota occupancy uses `publisher-pending-quotes` for typed publication and `publisher-pending-records` for catalog publication. The legacy typed profile derives a finite byte
 capacity from its existing row count and worst single-publication layout, preserving its row capacity.
 
 The complete input credit remains charged across detachment and all partial worker steps. It is returned
@@ -173,3 +173,7 @@ window and QTP frame size remain independent of input capacity and generator cal
 an entire payload would exceed a downstream window, the collector selection receives a separately owned
 packed range. This copy occurs at the retention boundary and keeps the original whole-publication input
 credit until all ranges are consumed. A single valid row retains the existing soft-window allowance.
+
+The implementation follows
+[ADR-0016: Whole-publication queue](../../docs/decisions/ADR-0016-whole-publication-queue.md).
+The matched performance comparison is recorded separately.

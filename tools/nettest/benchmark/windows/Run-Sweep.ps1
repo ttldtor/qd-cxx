@@ -14,6 +14,7 @@ param(
     [string]$ListenAddress = '127.0.0.1',
     [string]$OutputDirectory,
     [string]$PushgatewayUrl,
+    [ValidateRange(10,10000)][int]$SampleIntervalMs = 100,
     [switch]$Help
 )
 $ErrorActionPreference = 'Stop'
@@ -26,6 +27,7 @@ if ($Help -or !$PSBoundParameters.Count) {
     Write-Output '  [-ListenAddress NUMERIC_IP] [-Pacing sleep|yield] [-PushgatewayUrl URL]'
     Write-Output 'Default: Event, STREAM, one client, 10 s per run, one repeat, 127.0.0.1.'
     Write-Output 'Writes system baseline, per-run JSON and process CSV, and summary.csv to a new directory.'
+    Write-Output '-SampleIntervalMs 100 (10..10000) controls process/thread sampling; every run saves metrics.prom.'
     Write-Output 'The optional Pushgateway receives one snapshot after each completed run.'
     Write-Output 'Sequence, client, source and schema limits apply. See README.md for scope and measurements.'
     Write-Output 'Exit 0 when all runs pass, nonzero on configuration, start, validation or measurement failure.'
@@ -64,6 +66,7 @@ $jars = @('qds.jar','dxlib.jar','dxfeed-api.jar' | ForEach-Object { Join-Path $P
 foreach ($path in @($runner,$java,$program) + $jars) {
     if (!(Test-Path -LiteralPath $path -PathType Leaf)) { throw "Bundle file missing: $path" }
 }
+. (Join-Path $PSScriptRoot 'tools/MetricsExport.ps1')
 $output = (New-Item -ItemType Directory -Path $OutputDirectory).FullName
 $baseline = [ordered]@{
     capturedUtc = [DateTime]::UtcNow.ToString('o')
@@ -96,59 +99,20 @@ foreach ($rate in $rateValues) {
             Contract = $Contract
             ListenAddress = $ListenAddress
             Pacing = $Pacing
+            SampleIntervalMs = $SampleIntervalMs
         }
         if ($ProducerKind -eq 'Record') { $parameters.Bundle = Join-Path $PSScriptRoot 'schema' }
         & $runner @parameters
         $j = Get-Content -LiteralPath (Join-Path $resultDirectory 'result.json') -Raw | ConvertFrom-Json
-        $row = [pscustomobject]@{
-            run = $runName
-            producer = $ProducerKind
-            contract = $Contract.ToUpperInvariant()
-            clients = $Clients
-            targetRecordsPerSecond = $rate
-            nominalRecords = $j.nominalRecords
-            admitted = if ($ProducerKind -eq 'Event') { $j.sender.admitted } else { $j.sender.written }
-            deliveredTotal = $j.totalDelivered
-            deliveredPerSecondTotal = $j.deliveredIncludingDrainPerProducerSecond
-            producerCpuSeconds = $j.processes.producer.userCpuSeconds + $j.processes.producer.systemCpuSeconds
-            producerPeakWorkingSetBytes = $j.processes.producer.sampledPeakWorkingSetBytes
-            producerPeakPrivateBytes = $j.processes.producer.sampledPeakPrivateBytes
-            precision = $j.precision
-            pacing = $j.pacing
-        }
+        $row = New-NettestSummaryRow $j $runName
         $rows.Add($row)
-        $rows | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $output 'summary.csv')
+        Export-InvariantMetricCsv $rows (Join-Path $output 'summary.csv')
 
+        $metrics = ConvertTo-NettestPrometheus $j $row
+        $metrics | Set-Content -LiteralPath (Join-Path $resultDirectory 'metrics.prom') -NoNewline
         if ($PushgatewayUrl) {
-            $labels = 'producer="' + $ProducerKind + '",contract="' + $Contract + '",clients="' + $Clients +
-                '",pacing="' + $Pacing + '"'
-            $culture = [Globalization.CultureInfo]::InvariantCulture
-            $metrics = [Collections.Generic.List[string]]::new()
-            $metrics.AddRange([string[]]@(
-                '# TYPE qdcxx_nettest_offered_records_per_second gauge'
-                "qdcxx_nettest_offered_records_per_second{$labels} $rate"
-                '# TYPE qdcxx_nettest_delivered_records_per_second gauge'
-                ('qdcxx_nettest_delivered_records_per_second{' + $labels + '} ' + $row.deliveredPerSecondTotal.ToString($culture))
-                '# TYPE qdcxx_nettest_producer_cpu_seconds gauge'
-                ('qdcxx_nettest_producer_cpu_seconds{' + $labels + '} ' + $row.producerCpuSeconds.ToString($culture))
-                '# TYPE qdcxx_nettest_producer_peak_working_set_bytes gauge'
-                "qdcxx_nettest_producer_peak_working_set_bytes{$labels} $($row.producerPeakWorkingSetBytes)"
-                '# TYPE qdcxx_nettest_receiver_latency_p95_seconds gauge'
-                '# TYPE qdcxx_nettest_receiver_cpu_seconds gauge'
-                '# TYPE qdcxx_nettest_receiver_peak_working_set_bytes gauge'
-            ))
-            for ($index = 0; $index -lt $j.receivers.Count; ++$index) {
-                $receiver = $j.receivers[$index]
-                $process = $j.processes.receivers[$index]
-                $clientLabels = $labels + ',client="' + ($index + 1) + '"'
-                $p95 = if ($j.precision -eq 'ns') { [double]$receiver.latencyP95Ns / 1e9 } else { [double]$receiver.latencyP95Ms / 1e3 }
-                $cpu = $process.userCpuSeconds + $process.systemCpuSeconds
-                $metrics.Add(('qdcxx_nettest_receiver_latency_p95_seconds{' + $clientLabels + '} ' + $p95.ToString($culture)))
-                $metrics.Add(('qdcxx_nettest_receiver_cpu_seconds{' + $clientLabels + '} ' + $cpu.ToString($culture)))
-                $metrics.Add("qdcxx_nettest_receiver_peak_working_set_bytes{$clientLabels} $($process.sampledPeakWorkingSetBytes)")
-            }
             $target = $PushgatewayUrl.TrimEnd('/') + '/metrics/job/qd_cxx_nettest'
-            Invoke-RestMethod -Method Put -Uri $target -ContentType 'text/plain; version=0.0.4; charset=utf-8' -Body (($metrics -join [char]10) + [char]10) | Out-Null
+            Invoke-RestMethod -Method Put -Uri $target -ContentType 'text/plain; version=0.0.4; charset=utf-8' -Body $metrics | Out-Null
         }
     }
 }

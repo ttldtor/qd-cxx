@@ -22,6 +22,7 @@ param(
     [switch]$HelpRu,
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ProducerNamespace,
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$')][string]$ReceiverNamespace,
+    [ValidateRange(10, 10000)][int]$SampleIntervalMs = 100,
     [switch]$TcpNoDelay
 )
 
@@ -32,6 +33,7 @@ if ($HelpRu) {
     Write-Output 'Для qdcxx-event-nettest укажите -ProducerKind Event, без -Bundle. Batch 1..8 для STREAM, 1 для TICKER.'
     Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (sleep по умолчанию).'
     Write-Output 'На Linux Event: -ProducerNamespace ИМЯ -ReceiverNamespace ИМЯ используют настроенные сетевые пространства и требуют доступа к ip netns exec.'
+    Write-Output '-SampleIntervalMs 100 (10..10000) задаёт интервал выборок процессов и потоков; CSV и накладные расходы сохраняются.'
     Write-Output '-TcpNoDelay включает TCP_NODELAY у издателя Event.'
     Write-Output 'Параметры: -Duration 10 (1..300 с), -Rate 1000 (записей/с), -Batch 1 (1..32). Нагрузка должна укладываться в 22 бит.'
     Write-Output 'Сохраняет JSON, замеры процессов и журналы в новом каталоге. Завершает только свои дочерние процессы.'
@@ -44,6 +46,7 @@ if ($Help -or !$PSBoundParameters.Count) {
     Write-Output 'For qdcxx-event-nettest, pass -ProducerKind Event and omit -Bundle. Batch 1..8 for STREAM, 1 for TICKER.'
     Write-Output 'Event: -Clients 1..8, -Contract stream|ticker, -ListenAddress IPv4, -Precision Auto|ms|ns, -Pacing sleep|yield (default sleep).'
     Write-Output 'On Linux Event: -ProducerNamespace NAME -ReceiverNamespace NAME use existing network namespaces and require access to ip netns exec.'
+    Write-Output '-SampleIntervalMs 100 (10..10000) controls live process/thread sampling. Raw CSV and sampling overhead are retained.'
     Write-Output '-TcpNoDelay enables TCP_NODELAY on the Event publisher.'
     Write-Output 'Options: -Duration 10 (1..300 seconds), -Rate 1000 (records/sec), -Batch 1 (1..32).'
     Write-Output 'Offered records plus one batch must fit the 22-bit sequence range.'
@@ -119,7 +122,8 @@ $javaVersion = (& $Java -version 2>&1 | ForEach-Object { $_.ToString() }) -join 
 if ($LASTEXITCODE -ne 0) { throw 'Cannot read Java version.' }
 
 $clock = [Diagnostics.Stopwatch]::StartNew()
-$samples = [Collections.Generic.List[object]]::new()
+. (Join-Path $PSScriptRoot 'ProcessMetrics.ps1')
+$resources = New-ResourceSession -SampleIntervalMs $SampleIntervalMs
 $jdkOptions = @('-Xms32m', '-Xmx256m', '-Djava.net.preferIPv4Stack=true', '-Dcom.devexperts.qd.monitoring.MonitoredQDEndpoint$BuilderImpl.disable=true')
 if ($Precision -eq 'ns') { $jdkOptions += '-Ddxscheme.nanoTime=true' }
 
@@ -139,7 +143,7 @@ function Start-Child([string]$File, [string[]]$Arguments, [string]$Name) {
     $info.StandardOutputEncoding = [Text.Encoding]::UTF8
     foreach ($argument in $Arguments) { $info.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::Start($info)
-    @{
+    $child = @{
         Process = $process
         Name = $Name
         Prefix = [Collections.Generic.List[string]]::new()
@@ -147,31 +151,23 @@ function Start-Child([string]$File, [string[]]$Arguments, [string]$Name) {
         Output = $null
         ErrorText = $process.StandardError.ReadToEndAsync()
     }
+    try { Register-ResourceChild $resources $child } catch {
+        if (!$process.HasExited) { $process.Kill($true) }
+        $null = $process.WaitForExit(5000)
+        $process.Dispose()
+        throw
+    }
+    return $child
 }
 
 function Add-Sample($Child, [string]$Phase) {
-    if ($null -eq $Child -or $Child.Process.HasExited) { return }
-    $p = $Child.Process
-    try {
-        $p.Refresh()
-        $samples.Add([pscustomobject]@{
-            elapsedMs = $clock.Elapsed.TotalMilliseconds
-            process = $Child.Name
-            phase = $Phase
-            userCpuMs = $p.UserProcessorTime.TotalMilliseconds
-            systemCpuMs = $p.PrivilegedProcessorTime.TotalMilliseconds
-            workingSetBytes = $p.WorkingSet64
-            privateBytes = $p.PrivateMemorySize64
-        })
-    } catch {
-        if (!$p.HasExited) { throw }
-    }
+    Add-ResourceSample $resources $Child $Phase
 }
 
 function Wait-Marker($Child, [string]$Pattern, [int]$TimeoutMs, $Other = $null, [switch]$KeepReading) {
     $deadline = $clock.ElapsedMilliseconds + $TimeoutMs
     while ($clock.ElapsedMilliseconds -lt $deadline) {
-        if ($Child.Pending.Wait(100)) {
+        if ($Child.Pending.Wait($SampleIntervalMs)) {
             $line = $Child.Pending.GetAwaiter().GetResult()
             $Child.Pending = $null
             if ($null -eq $line) { throw "$($Child.Name) closed stdout before readiness." }
@@ -195,7 +191,7 @@ function Wait-Child($Child, [int]$TimeoutMs, [string]$Phase, $Other = $null) {
     do {
         Add-Sample $Child $Phase
         foreach ($peer in $Other) { Add-Sample $peer $Phase }
-        if ($Child.Process.WaitForExit(100)) { return }
+        if ($Child.Process.WaitForExit($SampleIntervalMs)) { return }
     } while ($clock.ElapsedMilliseconds -lt $deadline)
     throw "$($Child.Name) did not terminate before its timeout."
 }
@@ -234,30 +230,7 @@ function Save-Child($Child) {
 }
 
 function Get-ProcessSummary($Child) {
-    $Name = $Child.Name
-    $rows = @($samples | Where-Object { $_.process -eq $Name -and $_.phase -eq 'active' })
-    if ($rows.Count -lt 2) { throw "Too few live active samples for $Name." }
-    $first = $rows[0]
-    $last = $rows[-1]
-    $user = ($last.userCpuMs - $first.userCpuMs) / 1000
-    $system = ($last.systemCpuMs - $first.systemCpuMs) / 1000
-    $seconds = ($last.elapsedMs - $first.elapsedMs) / 1000
-    $memory = @($rows.workingSetBytes | Sort-Object)
-    $median = ($memory[[int][Math]::Floor(($memory.Count - 1) / 2)] +
-        $memory[[int][Math]::Floor($memory.Count / 2)]) / 2
-    return @{
-        pid = $Child.Process.Id
-        samples = $rows.Count
-        firstSampleMs = $first.elapsedMs
-        lastSampleMs = $last.elapsedMs
-        userCpuSeconds = $user
-        systemCpuSeconds = $system
-        averageCpuCores = ($user + $system) / $seconds
-        firstWorkingSetBytes = $first.workingSetBytes
-        medianWorkingSetBytes = $median
-        sampledPeakWorkingSetBytes = $memory[-1]
-        sampledPeakPrivateBytes = ($rows | Measure-Object privateBytes -Maximum).Maximum
-    }
+    Get-ResourceSummary $resources $Child
 }
 
 function Confirm-Probe($Producer, $Receivers) {
@@ -392,7 +365,7 @@ try {
     foreach ($child in @($receivers.ToArray(); $producer)) {
         try { Save-Child $child } catch { if (!$cleanupError) { $cleanupError = $_ } }
     }
-    $samples | Export-Csv -NoTypeInformation -LiteralPath (Join-Path $output 'process-samples.csv')
+    Export-ResourceSamples $resources $output
     if ($cleanupError) { throw $cleanupError }
 }
 $summary | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $output 'result.json')

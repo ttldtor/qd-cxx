@@ -97,7 +97,7 @@ fit the 22-bit sequence range so each record has a unique sequence number.
 
 `result.json` includes counts, records delivered including drain divided by the producer window,
 receiver latency quantiles and CPU and memory summaries for each process.
-`process-samples.csv` includes the raw periodic samples. Latency is the
+`process-samples.csv` includes the raw periodic samples. `thread-samples.csv` adds live per-thread CPU identities, and `sampling.json` records sample timing and overhead. `-SampleIntervalMs` defaults to 100 ms. See the [portable resource reference](benchmark/METRICS.md#portable-process-and-thread-resource-samples) and its finite `Test-ProcessMetrics.ps1` check. Latency is the
 signed same-host wall-clock difference from the timestamp in the generated
 record to its read by the QD verifier, at millisecond resolution. It includes
 the QD decoding and delivery path. CPU is the

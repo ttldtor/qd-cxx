@@ -36,7 +36,7 @@ The retry count depends on how frequently the producer checks for capacity.
 Every output directory must be new. It contains `baseline.json` with CPU load
 sampled before the runs, available memory and adapter link speeds, one folder
 per run, and `summary.csv`. Each run retains `result.json`, raw process
-samples and stdout/stderr. Refer to `result.json` for per-receiver latency,
+and thread samples, `sampling.json`, `metrics.prom`, and stdout/stderr. `-SampleIntervalMs 100` controls the nominal sampling interval (10..10000 ms). The JSON retains separate last observed live active memory, sampled peaks, OS lifetime peaks and observed-thread CPU intervals. Names are optional and thread roles are not inferred. Refer to `result.json` for per-receiver latency,
 delivery, CPU and memory. STREAM validates every expected record for each
 receiver. TICKER retains the latest value per subscribed key, so intermediate
 updates may be conflated and the final value is checked.
@@ -61,7 +61,7 @@ docker compose -f .\dashboard\docker-compose.yml up -d
 Grafana is at <http://127.0.0.1:3000> with the provisioned **qd-cxx NetTest**
 dashboard. Prometheus is at <http://127.0.0.1:9090>. The runner publishes a
 snapshot when each run completes. Prometheus scrapes it every five seconds.
-Use the retained JSON and CSV as the detailed per-run results. Docker pulls
+Use the retained JSON and CSV as the detailed per-run results. `metrics.prom` is exactly the posted snapshot; CPU gauges contain sampled-window deltas, so the dashboard uses them directly. Thread intervals can differ, and missing observations are NaN rather than zero. Repeated runs replace the job snapshot. Docker pulls
 the pinned images if they are absent. Stop the services with:
 
 ```powershell

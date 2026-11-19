@@ -33,6 +33,8 @@ struct PmrUtfStringResult {
 };
 
 /** Read Java UTFString, preserving raw UTF-16 units and measured noncanonical forms.
+ * Full field identity 137 uses this byte-counted grammar; identity 10 instead counts BMP units.
+ * See spec/encoding/FIELD-TYPES.md for field null/range and skip contracts.
  * May read past the declared body before detecting an overrun, but never past input.
  * No normalization, repair or rollback. Allocation may throw std::bad_alloc/std::length_error;
  * no partial result escapes. Memory is grown only for examined and budgeted units.

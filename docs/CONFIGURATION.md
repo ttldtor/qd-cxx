@@ -1,82 +1,155 @@
-# Configuration architecture requirements
+# Configuration ownership and precedence
 
-## Explicit binary JSON configuration
+[Русский](CONFIGURATION.ru.md) · [Settings reference](CONFIGURATION-REFERENCE.md) · [Endpoint properties](ENDPOINT-CONFIGURATION.md)
 
-The separately selected [binary profile](../spec/schema/NATIVE-BINARY-JSON.md) is loaded through
-`loadBinaryJsonSchema` with explicit logical fields, lookups and indexed/time contributors. Success
-owns a `BINARY_FIELDS_V1` schema with independent provenance. Copies retain identity; separate loads
-do not. Ordinary `loadJsonSchema` retains its v1 profile and limits. No core seam is added.
+English is authoritative.
 
-`BinaryJsonSchemaLimits` intersects original input/count/name bounds with parser-request bytes,
-logical work credits and logical two-copy schema-model bytes. These are separate scopes; model bytes
-are not an exact heap/RSS cap. Caller input, retained schemas and downstream copies remain external.
-No XML/imports, Java properties, inferred units/event mappings or live replacement is added.
-First backend selection by pinned simdjson may read `SIMDJSON_FORCE_IMPLEMENTATION`; the loader
-does not resolve application properties or mutate SDK globals. Foreign SDK-global mutation is outside
-resource qualification. [Validation mode](TAPE-INSPECT.md#binary-json-configuration-validation)
-finishes without tape/network work and adds no HISTORY subscription facade.
+Configuration belongs to the component that consumes it. Resolve sources at an explicit boundary,
+validate typed values, then pass them to that component. Core, codecs and event mappings do not
+discover application files, environment variables or mutable process properties.
 
-## Explicit wire-schema source
+## Choose the configuration boundary
 
-The tape inspector's `--wire-schema ordinary-v1` is an explicit source choice,
-mutually exclusive with `--schema PATH` and `--profile NAME`. It resolves at the
-CLI boundary before tape I/O; core/protocol read no environment, properties or
-schema files. [WIRE-INVENTORY](../spec/schema/WIRE-INVENTORY.md) bounds discovery
-and [TAPE-INSPECT](TAPE-INSPECT.md) specifies version-7 source metadata. Existing
-schema record/field/lookup/name options configure the complete union preflight;
-JSON document byte/depth options remain loader-only. No external loader or event
-adapter is implicitly selected, and JSON-disabled builds retain wire discovery.
+| Boundary | Current behavior | Reading path |
+| --- | --- | --- |
+| Public Feed API | `api::EndpointOptions` supplies typed policy; `api::EndpointConfiguration` resolves the supported text layers before endpoint construction. Typed verified TLS is supported by qualified TLS-enabled builds. | [Endpoint configuration](ENDPOINT-CONFIGURATION.md), [Feed API](FEED-API.md) |
+| Low-level controlled STREAM example | `client::EndpointSettings` becomes an immutable `client::EndpointOptions` snapshot. Its example driver accepts numeric-host plain TCP with one attempt. | The low-level snapshot sections below |
+| Schema acquisition | Explicit native JSON or wire discovery produces a validated owning schema. Consumers receive that schema separately from source loading. | [Ordinary JSON](../spec/schema/NATIVE-JSON.md), [binary JSON](../spec/schema/NATIVE-BINARY-JSON.md), [wire inventory](../spec/schema/WIRE-INVENTORY.md) |
+| Other components and tools | Typed settings, nested capacities and explicit work credits have their own owners. A field's presence does not enable another subsystem. | [Per-field reference](CONFIGURATION-REFERENCE.md), [developer tools](../tools/dev/README.md) |
 
-[Русская версия](CONFIGURATION.ru.md). English is authoritative.
+The two `EndpointOptions` types are different APIs in different namespaces. The plain-only limits
+of the low-level example do not describe the high-level Feed API. There is no general Java-properties
+loader, process-wide priority chain or universal live-update mechanism.
 
-The project needs counterparts for relevant Java QD/dxFeed settings across subsystems, not only event schemas.
-This remains a broader requirements and investigation effort: there is no general configuration loader or complete compatibility contract. The selected native endpoint API below accepts explicit typed snapshots within a defined boundary.
+## Resolve sources before activation
 
-## Sources and baseline
+For `api::EndpointConfiguration::create`, the priority from lowest to highest is:
 
-The implemented QDCXX-025 [schema settings subset](../spec/schema/CONFIGURED-EVENTS.md) adds fresh-JVM
-production observations for selected startup, endpoint file/API, mutation and XML inputs. It records
-the measured precedence and read timing per setting, including explicit field selection versus nanoTime.
-These observations supplement the source facts below; they do not establish a universal precedence
-or implement a C++ settings loader. Prepared event mappings consume only explicit validated schemas.
+1. Typed `api::EndpointOptions` fallback, whether supplied explicitly or default constructed.
+2. The caller's explicit defaults layer.
+3. The caller's explicit properties layer.
+4. Supported properties of the selected address, in block order.
 
-- [QD and dxFeed Java API Project Settings](https://github.com/dxFeed/dxfeed-graal-cxx-api/wiki/QD-and-dxFeed-Java-API-Project-Settings), read 2026-09-23: discovery list, not an exhaustive or pinned specification.
-- [Current release notes](https://github.com/devexperts/QD/blob/master/ReleaseNotes.txt): discovery and evolution history; master is mutable.
-- [Pinned release notes](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/ReleaseNotes.txt), source consumers and production observations define the baseline under `upstream.lock`.
+The last duplicate wins within a layer. Only the selected address is parsed. Every supplied entry,
+including a shadowed duplicate, consumes the input envelope and must use a supported key and bounded
+text; selected values undergo typed semantic validation. False, zero, absence and empty text retain
+their per-key meaning. For example, an empty native name is explicit, while empty inline
+`requestedAggregationPeriod` resets the request. This order is local to this resolver; it does not
+establish Java precedence for every property family.
 
-The pinned QDS 3.353 notes describe renamed scheme properties, retained deprecated aliases, and endpoint-file scheme properties overriding JVM system properties.
-That is a documented rule for those settings, not proof of one precedence order for all components.
-The pinned `SchemeProperties` source distinguishes explicit field selections from the nano-time shortcut and XML defaults from programmatic defaults.
-These are source/document observations, not new runtime captures.
+Construction resolves and validates before publishing an endpoint slot or admitting a connection.
+It performs no DNS, network, file discovery or application callback. `Endpoint::connect()` admits
+activation separately. Inline properties in a later `connect(address)` are rejected; they do not
+replace immutable construction policy. See the [supported keys and exact errors](ENDPOINT-CONFIGURATION.md).
 
-## Architectural requirements
+## Ownership, timing and observations
 
-1. Separate source acquisition, precedence resolution, typed validation and component application. Programmatic properties, properties files and launch-time options need a documented route into explicit configuration; environment-variable support and exact C++ CLI syntax require separate decisions.
-2. Allow compatible external property names where meaningful, while exposing typed values to consumers. Record deliberate renames/deviations; do not silently accept ineffective settings or imply JVM-only controls work in C++.
-3. Define scope and read timing per setting: process default, endpoint, connector, schema or another component; initialization snapshot, component rebuild or explicitly supported live update. A setter call after initialization does not automatically change an existing Java or C++ component.
-4. Allow independently configured instances to coexist. Global compatibility defaults may be an explicit resolution input; core/codecs/event mappings do not consult ambient mutable state. Snapshot semantics cannot silently replace an upstream live-update contract; investigate and decide such cases separately.
-5. Preserve absent, empty and explicit false/zero distinctions where relevant. Define types, units, ranges, parsing, invalid values, duplicate keys, aliases and source conflicts from evidence. Do not invent a universal priority such as command line over file.
-6. Record effective configuration and value origins for diagnostics, with secrets redacted and bounded output. Never put credentials, authenticated addresses or private configuration files into fixtures, manifests or logs.
-7. Keep configuration independent of transport implementation. Schema resolution produces the artifact from [ADR-0003](decisions/ADR-0003-configurable-schemas-and-event-mappings.md); network, collector and logging settings are consumed by their owning components, not the schema builder.
+Borrowed property strings live through `create`; successful configuration owns the retained values.
+`options()` is a borrowed const view while a retaining, non-moved-from handle lives. `snapshot()` owns
+its copies and does not keep a runtime or connection alive. Independent handles may be read/copied
+concurrently; replacement or destruction of the same handle requires synchronization. A moved-from
+handle may only be reassigned or destroyed.
 
-## Inventory and compatibility ledger
+`getEffectiveConfiguration()` copies local policy and admitted connection intent under the endpoint
+mutex. Requested and effective retry delay can differ: a one-attempt policy applies zero delay.
+Property origins identify the winning layer, not a server acknowledgement. Connection and requested
+aggregation revisions identify their respective local control changes. The original configuration
+stays immutable when `setRequestedAggregationPeriod` changes the endpoint's current request.
+Construction snapshots are not live views. Effective local policy does not prove DNS resolution,
+negotiation, delivery or a server-effective aggregation period.
 
-Create a project-wide ledger as a separately scoped follow-up before general configuration loading and operational-tool configuration are implemented.
-For each key or key family record: Java name and aliases; consuming source and pinned revision; subsystem; grammar/type/units/default/range; accepted sources and precedence; read timing/cache behavior; version/deprecation history; sensitivity; C++ disposition and proving tests.
-Dispositions are: implemented and verified, planned, unsupported, JVM-specific/not applicable, or unresolved. A discovered key is not automatically supported.
-Compare wiki entries with actual consumers and search generated keys as well as literal property calls; release notes explain changes but do not establish completeness.
+Settings containing a provider or dependency need their own lifetime contract. Shared ownership of a
+credential provider retains its handle, not synchronized application state, bounded callback time or
+secure erasure. The low-level snapshot contract below and the [verified Feed TLS contract](FEED-API.md)
+describe their respective invocation and retirement rules. Configuration resolution never calls a
+credential provider. Secrets must not enter ordinary labels, rejected-input diagnostics or fixtures.
 
-Cover schema/provider options, endpoint feed/publisher settings, connector/address properties, heartbeat/reconnect, file/replay, subscriptions/collectors/buffers, threading, logging/monitoring and test-only settings.
-Prioritize by implemented components and the [qds-tools roadmap](upstream/QDS-TOOLS.md), not by reproducing every internal Java tuning knob.
+## Reading the complete native inventory
 
-## Delivery boundary
+The [settings reference](CONFIGURATION-REFERENCE.md) identifies the declaration, type, units, default,
+read timing, mutability and failure behavior for each inventoried field. It separates field-specific
+consumer contracts from declaration-only entries and marks missing information explicitly.
+Nested settings are compositions; work credits are consumable inputs; requirement measurements and
+fixed constants are not settings. A capacity bounds retained state; a work quantum bounds an operation
+or turn. Neither silently becomes a lifetime record quota or a bound on process RSS.
 
-QDCXX-025 takes the schema-related slice: fresh-JVM source/precedence/timing probes, effective configuration provenance, and explicit resolved schemas for Quote/Profile.
-Use the ledger fields above rather than creating a competing property policy in each event adapter.
-A selected native [EndpointOptions API](CONFIGURATION.md#selected-native-endpoint-api-qdcxx-073) now provides explicit per-endpoint snapshots. The general C++ properties-file loader, complete settings catalogue, operational-tool properties and live-update policies remain follow-up work in [the roadmap](NEXT-STEPS.md).
-Properties requiring unsupported types or subsystems become explicit unsupported/deferred cases; do not coerce their values or change `upstream.lock` to make a case pass.
+Current defaults such as 64 input properties and 4/128 Feed record slots are configurable or
+profile-specific policies. They are not QTP limits. A declared number alone supplies no performance
+recommendation or proof that another value is supported. Reserved inactive fields, including the
+attachment diagnostic-text budget, must not be presented as effective resource controls.
+
+## Accepted evolution; implementation remains separate
+
+The configuration contract for future loaders and component updates is:
+
+- Each setting has an owning consumer, exact type/unit/default, validation, origin and revision.
+  Requested and applied states are observable; secrets are redacted. A setting declares whether it
+  applies immediately, on reconnect or after restart. Unsupported settings cannot appear applied.
+- Applications attach file, launch-option or environment loaders explicitly. Acquisition, precedence,
+  typed validation and application remain separate. Existing endpoint precedence is preserved;
+  another property family requires its own evidence and declared priority. No CLI or file syntax is
+  introduced here.
+- Structural validation precedes activation. Unknown enum values reject; compatibility behavior for
+  unknown properties must be explicitly selected. In particular, the accepted IPF completion-policy
+  rule rejects unknown enum values before reading or publication; the current consumer's fallback
+  behavior is documented separately in the reference.
+- A budget reduction below occupied state and outstanding reservations rejects. A supported deferred
+  reduction is a separate observable operation. Linked live changes require consistent application
+  and explicit failure outcomes; snapshot construction alone does not implement that machinery.
+- Admission evolves toward byte budgets accounting for payload ownership and metadata. Scheduling
+  quanta, semantic query limits and wire-format bounds stay distinct. Existing 4/128 and symbol-size
+  guards remain until a qualified replacement preserves their guarantees.
+- The qualified TLS Certificate/CertificateRequest profile remains bounded at 65,536 bytes. Expanding
+  it requires dependency-owner and resource qualification; raising a field is insufficient. Normal
+  recovery-tool operation is intended to use the common byte profile, with any retained old count
+  profile named explicitly and documented in help.
+
+These are accepted requirements, not claims that general loaders, atomic updates, byte-budget
+replacement or recovery-tool migration are implemented. Source-specific unknowns in the reference
+remain unknown until the owning contract and its checks establish them.
+
+## Java compatibility evidence
+
+The [configured-event baseline](../spec/schema/CONFIGURED-EVENTS.md) records fresh-JVM production
+observations for selected startup, endpoint file/API, mutation and XML inputs. Explicit field
+selection, nano-time shortcuts, XML defaults and programmatic defaults have distinct rules.
+The [endpoint oracle](../tools/upstream/endpoint-configuration-oracle/README.md) records another
+bounded family. Neither establishes universal Java precedence or universal live mutability.
+
+Java names, aliases, defaults, units, deprecation and read timing must trace to locked consumers and
+captures under `upstream.lock`. The [project settings wiki](https://github.com/dxFeed/dxfeed-graal-cxx-api/wiki/QD-and-dxFeed-Java-API-Project-Settings)
+and release notes are discovery aids. [Pinned release notes](https://github.com/devexperts/QD/blob/0ddc0a09779fb61d74cc0b37c6449ff47dcb715f/ReleaseNotes.txt)
+describe endpoint-file scheme properties overriding JVM properties for that family; the rule does
+not transfer automatically to connectors, logging, monitoring or collectors. Unimplemented Java
+families remain explicit compatibility work rather than silently accepted native properties.
+
+## Explicit schema sources
+
+`loadBinaryJsonSchema` selects the [binary profile](../spec/schema/NATIVE-BINARY-JSON.md) with explicit
+logical fields, lookups and indexed/time contributors. Success owns a `BINARY_FIELDS_V1` schema with
+independent provenance; copies retain identity, separate loads do not. Ordinary `loadJsonSchema`
+retains its v1 profile and limits. `BinaryJsonSchemaLimits` intersects input/count/name bounds with
+parser-request bytes, logical work credits and two-copy schema-model bytes; model bytes are not an
+exact heap/RSS cap. Caller input, retained schemas and downstream copies remain separate.
+
+First pinned simdjson backend selection may read `SIMDJSON_FORCE_IMPLEMENTATION`. That dependency
+selection does not resolve application properties; foreign SDK-global mutation remains outside
+resource qualification. No XML imports, inferred units/event mappings or live schema replacement
+is added. [Validation mode](TAPE-INSPECT.md#binary-json-configuration-validation) finishes without
+tape/network work and adds no HISTORY subscription facade.
+
+The inspector's `--wire-schema ordinary-v1` is mutually exclusive with `--schema PATH` and
+`--profile NAME`. It resolves at the CLI boundary before tape I/O. Existing record/field/lookup/name options
+bound complete union preflight; JSON document/depth options remain loader-only. Wire discovery
+remains available without JSON. [WIRE-INVENTORY](../spec/schema/WIRE-INVENTORY.md) bounds discovery;
+[TAPE-INSPECT](TAPE-INSPECT.md) specifies version-7 source metadata. No external loader or event
+adapter is selected implicitly.
 
 ## Selected native endpoint API (QDCXX-073)
+
+These sections describe the low-level `client::EndpointOptions` and controlled example driver.
+The public `api::EndpointOptions` and its working TLS/reconnect support have a separate
+[Feed contract](FEED-API.md). Statements about a future consumer below concern this low-level handoff.
 
 The selected `client::EndpointOptions` value is created from a validated `core::LocalSchema` and explicit `client::EndpointSettings`. Creation copies the schema and caller-provided strings/settings into an immutable snapshot. The snapshot preserves schema provenance and does not retain the caller's schema or settings objects. Mutating or destroying those inputs after successful creation does not change the snapshot.
 
@@ -183,6 +256,3 @@ int main() {
 ```
 
 Expected stdout: Independent endpoint snapshots: 7301, 7302. The program exits 0. The installed consumer passed on Windows and Linux.
-
-
-[Endpoint configuration](ENDPOINT-CONFIGURATION.md): explicit addresses/properties, immutable snapshots, effective local values and Java compatibility boundaries.

@@ -77,7 +77,9 @@ composeSerialTypeId(SerialType type, FieldRepresentation representation = FieldR
 }
 
 /** Named full serial type identities, composed from base serialization and representation.
- * See spec/encoding/FIELD-TYPES.md for decomposition, supported identities and upstream provenance.
+ * See spec/encoding/FIELD-TYPES.md for each full identity's wire grammar,
+ * Java storage, canonical null/range, unsupported cases and recorded oracle evidence.
+ * A physical Java VOID tail is not another logical value; nullable payloads remain distinct from zero.
  * This enum is intentionally incomplete. Raw inputs retain numeric IDs so that
  * unsupported identities can be validated without masking representation bits.
  */
