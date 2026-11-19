@@ -9,6 +9,7 @@
 #include "../core/delivery_statistics.hpp"
 #include "../protocol/shared_record_access.hpp"
 #include "interest_transaction.hpp"
+#include "publisher_stream_batch.hpp"
 #include "qd/protocol/incoming_subscription.hpp"
 #include "queue_replace.hpp"
 #include "queue_schedule.hpp"
@@ -1010,18 +1011,13 @@ struct QueueRecord {
 
 /** Private local STREAM metadata, shared only by disjoint logical row ranges. */
 struct StreamRun {
-    struct Row {
-        const core::detail::SharedRecordPayload *payload;
-        RawSourceMetadata source;
-    };
-
     BudgetLease budget;
     MuxRecordView common{};
-    Vector<Row> rows;
+    Vector<PublisherStreamRow> rows;
     Vector<std::shared_ptr<ClientPayloadLease>> payloads;
 
     explicit StreamRun(BudgetLease source)
-        : budget(source), rows(QueueAllocator<Row>{clientScope(source, AllocationTag::ARENA)}),
+        : budget(source), rows(QueueAllocator<PublisherStreamRow>{clientScope(source, AllocationTag::ARENA)}),
           payloads(QueueAllocator<std::shared_ptr<ClientPayloadLease>>{clientScope(source, AllocationTag::ARENA)}) {
     }
 
@@ -1090,6 +1086,7 @@ struct StreamRange {
     StreamRange take(std::size_t size) noexcept {
         StreamRange result(owner, first, size);
         result.remaining = remaining;
+        result.selection = selection;
         first += size;
         count -= size;
 
@@ -1412,6 +1409,12 @@ std::span<const MuxRecordView> OwnedMuxBatch::records() const noexcept {
     return state_ ? std::span<const MuxRecordView>(state_->views) : std::span<const MuxRecordView>{};
 }
 
+detail::PublisherStreamRange detail::PublisherStreamBatch::range(std::size_t index) const noexcept {
+    const auto &range = owner_->streamRanges[index];
+
+    return {range.owner->common, std::span(range.owner->rows).subspan(range.first, range.count), range.selection};
+}
+
 QueueIdentity OwnedMuxBatch::epoch() const noexcept {
     return state_ && !state_->views.empty() ? state_->views[0].epoch : QueueIdentity{};
 }
@@ -1697,6 +1700,7 @@ struct MuxQueue::State {
         bool historyReplayCommitted = false; ///< Source replay survives mapping-metadata WORK_LIMIT retries.
         bool sync = true;                    ///< Owner gates.
         bool paused = false;                 ///< A reserved pause gates later callbacks.
+        bool publisherStream = false;        ///< Only a typed private registration can receive range batches.
         bool aggregationCollecting = false;  ///< TICKER batch is accumulating from its own collector.
         bool closing = false;                ///< Owner gates.
         bool sourceClosed = false;           ///< Owner gates.
@@ -2554,7 +2558,7 @@ struct MuxQueue::State {
             bound(units, l.recordFieldUnits);
             bound(bytes, l.recordByteUnits);
             bound(recordArenaBytes(r.symbol, r.values, r.typedValues), l.recordArenaBytes);
-            spend(work, 4, 0, r.symbol.size(), sizeof(detail::StreamRun::Row));
+            spend(work, 4, 0, r.symbol.size(), sizeof(detail::PublisherStreamRow));
 
             if (payload->batchIdentity() != previous) {
                 run->payloads.push_back(streamPayload(c, payload, work));
@@ -3040,6 +3044,19 @@ std::expected<MuxHandle, QueueFailure> MuxQueue::open(ClientLimits limits, const
     } catch (const std::bad_alloc &) {
         return std::unexpected(QueueFailure{QueueError::ALLOCATION_FAILURE, {}});
     }
+}
+
+std::expected<MuxHandle, QueueFailure> detail::QueueScheduleAccess::openPublisherStream(
+    MuxQueue &queue, ClientLimits limits, const std::shared_ptr<PublisherStreamConsumer> &consumer, QueueWork &work) {
+    if (queue.state_ && queue.state_->family != core::SubscriptionFamily::STREAM)
+        return std::unexpected(QueueFailure{QueueError::INVALID_CONFIGURATION, {}});
+
+    auto handle = queue.open(limits, consumer, work);
+
+    if (handle)
+        queue.state_->client(*handle)->publisherStream = true;
+
+    return handle;
 }
 
 std::expected<MuxQueue::State::Replacement, QueueFailure>
@@ -4228,10 +4245,14 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
                 if (c.statistics)
                     batch->appliedDesiredRevision = c.candidateLogicalRevision;
 
-                batch->views.reserve(selected);
+                if (!c.publisherStream)
+                    batch->views.reserve(selected);
+
                 batch->streamRanges.reserve(selectedRanges);
 
-                for (std::size_t index = 0, remaining = prefix; remaining; ++index) {
+                const auto viewPrefix = c.publisherStream ? 0 : prefix;
+
+                for (std::size_t index = 0, remaining = viewPrefix; remaining; ++index) {
                     const auto &range = c.streamRange.at(index);
                     const auto rows = std::min(remaining, range.count);
 
@@ -4418,8 +4439,6 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
             s.inFlightEvents += selectedWeight;
         });
         auto guard = c.consumer;
-        BorrowedMuxBatch borrowed;
-        borrowed.state_ = batch;
 
         if (c.statistics) {
             std::lock_guard lock(c.statistics->mutex);
@@ -4434,7 +4453,16 @@ std::expected<bool, QueueFailure> MuxQueue::State::callback(Client &c, QueueWork
         c.port->resume.exchange(false, std::memory_order_acq_rel);
         executing = true;
         try {
-            const auto action = guard->onBatch(borrowed);
+            BatchAction action;
+
+            if (c.publisherStream && !batch->streamRanges.empty()) {
+                action = static_cast<detail::PublisherStreamConsumer &>(*guard).onStreamRanges({batch, selected});
+            } else {
+                BorrowedMuxBatch borrowed;
+                borrowed.state_ = batch;
+                action = guard->onBatch(borrowed);
+            }
+
             executing = false;
             c.paused = action == BatchAction::PAUSE && !c.port->resume.exchange(false, std::memory_order_acq_rel);
             count(c.counts.callbackCompletedBatches, 1, c.counts.saturated);
