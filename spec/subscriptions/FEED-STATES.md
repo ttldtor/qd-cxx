@@ -70,13 +70,17 @@ exceptions cannot produce `CLOSED` to `FAILED` or recursive `FAILED` notificatio
 Native registrations and every pre-existing event callback/capture retire before
 `CLOSED` is published. The new opt-in state observer selected for that terminal
 notification necessarily remains alive while receiving it. Its callback/capture
-retirement is the sole additional category that can remain after `CLOSED`.
+retirement can remain after `CLOSED`. Endpoint OnDemand observer captures may also
+remain retained until the final retirement ledger is empty.
 Endpoint await and runtime shutdown return only after both event and state ledgers
 are zero; endpoint/subscription registry slots remain charged until then. The event
 capture-drain phase does not wait for still-registered state observers that must
 receive the later terminal observation. All application callable destruction occurs
 outside control locks, with creator retirement reentry guarded. Handles may outlive
 the runtime as detached terminal ports, retaining both detached diagnostics.
+
+See [endpoint close and result interpretation](FEED-LIFECYCLE.md#closing-an-endpoint-and-interpreting-the-result)
+for the state, retirement and result-field guarantees.
 
 ## Compatibility evidence
 
