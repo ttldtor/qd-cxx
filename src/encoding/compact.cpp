@@ -15,8 +15,7 @@ constexpr unsigned int BITS_PER_BYTE = 8;
 constexpr unsigned int PREFIX_HIGH_BIT = 0x80U;
 /// One-byte compact payload; each leading length bit removes one of these bits.
 constexpr unsigned int SINGLE_BYTE_PAYLOAD_MASK = 0x7fU;
-/// Bits available in the signed payload per compact byte before the full-width escape.
-constexpr unsigned int PAYLOAD_BITS_PER_BYTE = 7;
+using detail::PAYLOAD_BITS_PER_BYTE;
 /// Low octet extracted from the big-endian payload.
 constexpr unsigned int BYTE_MASK = 0xffU;
 /// All-one prefix selects the full 64-bit payload.
@@ -24,23 +23,6 @@ constexpr unsigned int FULL_WIDTH_PREFIX = 0xffU;
 /// Width of the Java long bit pattern, including its sign bit.
 constexpr unsigned int LONG_BITS = 64;
 
-/** Choose the shortest compact representation of a signed long.
- * @param value Signed value to encode.
- * @return Encoded byte count, including the prefix byte.
- */
-std::size_t compactLongSize(std::int64_t value) noexcept {
-    for (std::size_t size = 1; size < detail::MAX_COMPACT_LONG_BYTES; ++size) {
-        // Each extra octet adds eight payload bits but spends one more prefix bit: net seven.
-        // One payload bit carries the sign, giving the interval [-2^(width-1), 2^(width-1)).
-        const auto limit = std::int64_t{1} << (PAYLOAD_BITS_PER_BYTE * size - 1);
-
-        if (value >= -limit && value < limit) {
-            return size;
-        }
-    }
-
-    return detail::MAX_COMPACT_LONG_BYTES;
-}
 } // namespace
 
 ReadResult<std::int64_t> readCompactLong(std::span<const std::byte> input) noexcept {
@@ -84,13 +66,8 @@ ReadResult<std::int32_t> readCompactInt(std::span<const std::byte> input) noexce
     return {std::bit_cast<std::int32_t>(lowBits), result.consumed, result.status};
 }
 
-WriteResult writeCompactLong(std::int64_t value, std::span<std::byte> output) noexcept {
-    const auto size = compactLongSize(value);
-
-    if (output.size() < size) {
-        return {0, Status::INSUFFICIENT_OUTPUT};
-    }
-
+void detail::writeCompactLongExact(std::int64_t value, std::span<std::byte> output) noexcept {
+    const auto size = output.size();
     auto bits = static_cast<std::uint64_t>(value);
 
     for (std::size_t index = size - 1; index > 0; --index) {
@@ -105,6 +82,16 @@ WriteResult writeCompactLong(std::int64_t value, std::span<std::byte> output) no
                             : (BYTE_MASK << (BITS_PER_BYTE - (size - 1))) & BYTE_MASK;
     const auto mask = size - 1 < PAYLOAD_BITS_PER_BYTE ? SINGLE_BYTE_PAYLOAD_MASK >> (size - 1) : 0;
     output[0] = static_cast<std::byte>(prefix | (bits & mask));
+}
+
+WriteResult writeCompactLong(std::int64_t value, std::span<std::byte> output) noexcept {
+    const auto size = detail::compactLongSize(value);
+
+    if (output.size() < size) {
+        return {0, Status::INSUFFICIENT_OUTPUT};
+    }
+
+    detail::writeCompactLongExact(value, output.first(size));
 
     return {size, Status::OK};
 }
