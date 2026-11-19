@@ -90,6 +90,10 @@ implement their documented receiving profiles, including verified TLS and option
 The plain TCP adapter retains its own narrower contract. The [receiving qualification](../tests/conformance/subscriptions/DELIVERY-VALIDATION.md)
 records the composed checks; neither the ADR nor component checks establish full QD compatibility or release.
 
+The [server execution strategy](../spec/transport/SERVER-EXECUTION.md) compares the current
+owner loop with a candidate adapter on the existing Asio pin, including ownership,
+shutdown and the evidence required before switching.
+
 ## Accepted direction for further implementation
 
 The next architecture extends the shared record path across receiving, processing and publication.
