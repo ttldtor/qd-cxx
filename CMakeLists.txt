@@ -1952,7 +1952,7 @@ if(BUILD_TESTING)
     add_test(NAME protocol_incoming_subscription COMMAND qdcxx_incoming_subscription_tests)
     set_tests_properties(protocol_subscription_writer PROPERTIES TIMEOUT 60)
     add_executable(qdcxx_live_session_tests tests/conformance/live_session_tests.cpp)
-    target_link_libraries(qdcxx_live_session_tests PRIVATE qdcxx_protocol qdcxx_quote doctest::doctest)
+    target_link_libraries(qdcxx_live_session_tests PRIVATE qdcxx_protocol qdcxx_quote doctest::doctest Threads::Threads)
     target_compile_definitions(qdcxx_live_session_tests PRIVATE
         "ORG_TTLDTOR_QDCXX_LIVE_SOURCE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
         "ORG_TTLDTOR_QDCXX_LIVE_CAPTURE_DIR=\"${CMAKE_CURRENT_BINARY_DIR}/live-session-native\"")

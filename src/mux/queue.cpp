@@ -2286,7 +2286,7 @@ struct MuxQueue::State {
         bound(bytes, l.recordByteUnits);
         const auto required = recordArenaBytes(key.symbol, legacy, fields);
         bound(required, l.recordArenaBytes);
-        const auto arenaBytes = shared                 ? sharedRow->payloadBytes()
+        const auto arenaBytes = shared ? (sharedRow->selectionSensitive() ? required : sharedRow->payloadBytes())
                                 : l.compactRecordArena ? required
                                                        : l.recordArenaBytes;
         const auto charge = sum(
@@ -2441,6 +2441,62 @@ struct MuxQueue::State {
         }
 
         return result;
+    }
+
+    /** Preflight receive retention after selection, without reserving a client's capacity.
+     * @param c Selected client with its current detached reservations.
+     * @param input One homogeneous source range, including whole-frame capacity attribution.
+     * @param work Remaining bounded metadata examination credits.
+     * @return Whether even cold accounting caches fit; otherwise use independent selected-row copies.
+     */
+    bool receiveRangeFits(Client &c, const collectors::detail::StreamRangeDelivery &input, QueueWork &work) {
+        if (!input.payloads.front()->selectionSensitive())
+            return true;
+
+        try {
+            const auto &context = *ledger;
+            const auto &budget = *c.port->budget;
+            const auto control = [&](detail::ControlKind kind) {
+                return context.controlBytes[static_cast<std::size_t>(kind)];
+            };
+            const auto metadata = product(input.records.size(), control(detail::ControlKind::RECORD));
+            std::size_t physical = 0, consumer = 0;
+            const void *previous = nullptr;
+            spend(work, input.payloads.size());
+
+            for (std::size_t i = 0; i < input.payloads.size(); ++i) {
+                const auto &payload = input.payloads[i];
+                const auto &row = input.records[i];
+
+                if (budget.limits.batchRecordBytes) {
+                    spend(work, 0, row.typedValues.size());
+
+                    if (sum(control(detail::ControlKind::RECORD),
+                            recordArenaBytes(row.symbol, row.values, row.typedValues)) > budget.limits.batchRecordBytes)
+                        return false;
+                }
+
+                if (payload->batchIdentity() == previous)
+                    continue;
+
+                previous = payload->batchIdentity();
+                const auto retained =
+                    sum(sum(payload->residentBytes(), control(detail::ControlKind::SHARED_RECORD)),
+                        product(context.limits.clients, sizeof(detail::SharedQueuePayload::ClientSlot)));
+                physical = sum(physical, sum(retained, control(detail::ControlKind::CLIENT_PAYLOAD)));
+                consumer = sum(consumer, sum(retained, control(detail::ControlKind::CLIENT_PAYLOAD)));
+            }
+
+            // Cold-cache bounds avoid a weak-cache final-release race between preflight and construction.
+            // Actual allocators still charge only requests and leases that are really created.
+            return sum(consumer, metadata) <= budget.limits.recordBytes - budget.recordBytes.load() &&
+                   sum(physical, metadata) <= context.limits.recordBytes - context.recordBytes.load();
+        } catch (QueueError error) {
+            if (error == QueueError::RESOURCE_LIMIT)
+                return false;
+
+            throw;
+        }
     }
 
     /** Build one homogeneous private run; no logical row reservation escapes on failure. */
@@ -3888,6 +3944,7 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
 
         std::expected<std::span<const collectors::StreamDelivery>, collectors::StreamError> prepared;
         bool sharedInput = false;
+        bool receivePerRow = false;
 
         if (range) {
             clear.rangeOnly = true;
@@ -3905,6 +3962,10 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
             sharedInput = std::ranges::any_of(std::span(sourcePayloads).first(prepared->size()), [](const auto &owner) {
                 return bool(owner);
             });
+            receivePerRow =
+                std::ranges::any_of(std::span(sourcePayloads).first(prepared->size()), [](const auto &owner) {
+                    return owner && owner->selectionSensitive();
+                });
         }
 
         for (std::size_t v = 0; v < clients.size(); ++v) {
@@ -3928,12 +3989,34 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                 candidateCounts[v] = range->records.size();
                 candidateWeights[v] = product(range->records.size(), selected->count());
                 try {
-                    c->candidateRun = streamRun(*c, *range, *selected, work);
+                    if (!range->payloads.front()->selectionSensitive()) {
+                        c->candidateRun = streamRun(*c, *range, *selected, work);
+                    } else {
+                        const bool share = receiveRangeFits(*c, *range, work);
+                        clear.rangeOnly = false;
+
+                        for (std::size_t i = 0; i < range->records.size(); ++i) {
+                            const auto &r = range->records[i];
+                            const auto &payload = range->payloads[i];
+                            auto lease = share ? streamPayload(*c, payload, work)
+                                               : std::shared_ptr<detail::ClientPayloadLease>{};
+                            const RawSourceMetadata raw{r.senderId,         r.cipher,    r.eventFlags,
+                                                        r.removalTime,      r.fieldTime, range->bindingGeneration,
+                                                        r.tapeMessageTimeMs};
+                            candidates[v * limits.routeRecords + i] =
+                                record(*c, {r.context, r.symbol}, {}, r.eventFlags, r.values, r.typedValues, *selected,
+                                       range->revision, raw, {}, work, false, false, false, {}, std::move(lease),
+                                       share ? payload.get() : nullptr);
+                        }
+                    }
                 } catch (QueueError error) {
                     if (error != QueueError::RESOURCE_LIMIT)
                         throw;
 
                     candidateFailure[v] = 1;
+
+                    for (std::size_t i = 0; i < candidateCounts[v]; ++i)
+                        candidates[v * limits.routeRecords + i].reset();
                 }
                 continue;
             }
@@ -3976,17 +4059,22 @@ std::expected<bool, QueueFailure> MuxQueue::State::routeStream(QueueWork &work) 
                 }
 
                 try {
-                    if (index == 0 && sharedInput)
+                    const auto &sourcePayload = sourcePayloads[offerIndex];
+                    const bool receiveFallback = sourcePayload && sourcePayload->selectionSensitive();
+
+                    if (index == 0 && sharedInput && !receivePerRow)
                         slab = streamSlab(*c, *prepared, work, sharedInput);
 
-                    auto clientPayload = streamPayload(*c, sourcePayloads[offerIndex], work);
+                    auto clientPayload = receiveFallback ? std::shared_ptr<detail::ClientPayloadLease>{}
+                                                         : streamPayload(*c, sourcePayload, work);
 
                     const RawSourceMetadata raw{r.senderId,         r.cipher,    r.eventFlags,
                                                 r.removalTime,      r.fieldTime, offer.bindingGeneration,
                                                 r.tapeMessageTimeMs};
-                    candidates[v * limits.routeRecords + index] = record(
-                        *c, {r.context, r.symbol}, {}, r.eventFlags, r.values, r.typedValues, selected, offer.revision,
-                        raw, {}, work, false, false, false, slab, clientPayload, sourcePayloads[offerIndex].get());
+                    candidates[v * limits.routeRecords + index] =
+                        record(*c, {r.context, r.symbol}, {}, r.eventFlags, r.values, r.typedValues, selected,
+                               offer.revision, raw, {}, work, false, false, false, slab, clientPayload,
+                               receiveFallback ? nullptr : sourcePayload.get());
                 } catch (QueueError e) {
                     if (e != QueueError::RESOURCE_LIMIT) {
                         throw;

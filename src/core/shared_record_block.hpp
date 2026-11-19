@@ -27,6 +27,7 @@ enum class RecordBlockError {
 struct RecordByteState {
     const std::size_t capacity;
     std::atomic<std::size_t> used{0};
+    std::atomic<std::size_t> peak{0}; ///< Highest successful simultaneous physical reservation.
 
     explicit RecordByteState(std::size_t bytes) : capacity(bytes) {
     }
@@ -43,6 +44,12 @@ struct RecordByteState {
                 throw RecordBlockError::WOULD_BLOCK;
             }
         } while (!used.compare_exchange_weak(current, current + bytes, std::memory_order_relaxed));
+
+        const auto admitted = current + bytes;
+        auto highest = peak.load(std::memory_order_relaxed);
+
+        while (highest < admitted && !peak.compare_exchange_weak(highest, admitted, std::memory_order_relaxed)) {
+        }
     }
 };
 
@@ -339,6 +346,9 @@ struct BoundRecordBatch : SharedRecordPayload::Batch {
                      RecordBlockAccounting measured, std::size_t rows)
         : Batch(measured.backingAllocationBytes), backingReservation(std::move(reservation)),
           binding(std::move(snapshot)), accounting(measured), count(rows) {
+        Batch::schema = &binding->schema;
+        Batch::sourceGeneration = binding->source.generation;
+        Batch::sourceOrigin = binding->source.origin;
     }
 
     ~BoundRecordBatch() {

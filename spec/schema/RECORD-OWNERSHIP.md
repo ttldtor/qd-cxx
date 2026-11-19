@@ -160,6 +160,44 @@ path. Its complete binding/source metadata survive inside the retained owner; ex
 views still expose their current represented metadata and provenance. This is a storage candidate,
 not the public RecordFeed, whole production pipeline migration or common cross-component ledger.
 Existing public retention/reservation and `LiveEvent` release-affinity contracts remain in force.
+## Private typed receive owners
+
+Typed live DATA decodes once into a pure arena-backed owner. Immutable row aliases retain its
+symbols, exact fields, complete local schema, committed source generation and represented source
+metadata. The original schema moves once into an immutable catalog during successful session
+creation. Final PMR vectors and inline strings stop moving before views are published. No detached
+owner retains a decoder plan, `LiveSnapshot`, `LiveIdentity`, session, callback or executor. A failed
+frame, including descriptor failure after decode, exposes no prefix and restores candidate charges.
+
+One atomic physical epoch domain includes its own measured control and all operational/detached
+requests. Receive control, initial/growth backing, abandoned/spare capacity and wrapper/core/row
+descriptors share the existing fixed or elastic frame allowance. Catalog capacity transfers without
+a second physical reservation. Operational owner slots stay serialized; fixed session storage retires
+with its actual framer/composer owner. Detached destruction releases objects before their resource
+and backing before reservations. Allocator controls keep pure accounting through final weak release,
+which may overlap continued receive. Ordinary `LiveEvent` release affinity remains unchanged.
+
+The existing homogeneous range path requires `compactRecordArena` and empty queues for all active
+clients. Otherwise all selected receive rows use the existing copied per-row path.
+
+For homogeneous typed STREAM selections, each client may retain the complete frame/catalog when
+that capacity and actual accounting/record controls fit its remaining quota and the aggregate
+record domain. Ordinary queue record controls preserve existing callback assembly. Cold-cache
+preflight is conservative; actual reservations charge only created owners. An enabled per-batch
+record-byte window can select copying for an oversized row. Smaller clients use existing bounded
+independent selected-row copies. Heterogeneous/per-row receive routing also copies. An already
+admitted alias keeps its whole charge until final release; later input cannot compact it, so
+simultaneous occupancy can differ from independent copied records. Fallback copies and transient
+overlap are separate costs. The arena does not promise the packed candidate's two requests.
+
+The validated `COMPACT_INT_V1` profile keeps event-owned decode and copied delivery without a
+second decode or loss of `values`. Typed TICKER/HISTORY uses the pure frame owner while preserving
+collector/copy semantics. Existing copied `OwnedMuxBatch` data still preserves values, required
+metadata and provenance without a new complete-schema promise. The future RecordFeed independent
+copy contract remains separate. No new public retention API, record-count ceiling or wire change
+is introduced. [ADR-0015](../../docs/decisions/ADR-0015-shared-record-blocks.md) describes the owner
+boundaries, allocation-layout costs and conditional shared-delivery scope.
+
 ## Verification and traceability
 
 The source-backed current contract is exercised by

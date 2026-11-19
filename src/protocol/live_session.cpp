@@ -5,6 +5,7 @@
 #include "shared_record_access.hpp"
 #include "tape_event_bridge.hpp"
 
+#include "../core/shared_record_block.hpp"
 #include "field_time_binding.hpp"
 #include "live_authorization.hpp"
 #include "live_decode.hpp"
@@ -29,15 +30,29 @@ namespace {
 /** Configured backing exhaustion, distinct from an allocator failure. */
 struct LiveStorageLimit {};
 
-/** Single serialized domain's requested backing ledger; allocation overhead is excluded. */
+/** Serialized owner slots over a detached atomic physical byte domain. */
 class LiveStorage {
-    std::size_t references_ = 1; ///< Session and independent owners retain this epoch identity.
-    std::size_t resident_;       ///< Currently reserved requested backing and object bytes.
-    std::size_t maximum_;        ///< Maximum simultaneous requested backing bytes.
-    std::size_t peak_;           ///< Highest successfully reserved simultaneous byte count.
-    std::size_t base_;           ///< Fixed conservative configuration reservation held by every epoch lease.
-    std::size_t owners_ = 0;     ///< Distinct snapshot, event and pending-output owners.
-    std::size_t maximumOwners_;  ///< Finite simultaneous owner count, including candidates.
+    /** Check the domain's own control before allocating it.
+     * @param maximum Complete epoch physical capacity.
+     * @param base Existing fixed configuration capacity.
+     * @return Validated maximum; configured exhaustion allocates no counter control.
+     */
+    static std::size_t checkedMaximum(std::size_t maximum, std::size_t base) {
+        const auto metadata = core::detail::RecordByteBudget::metadataAllocationBytes();
+
+        if (sizeof(LiveStorage) > maximum || base > maximum - sizeof(LiveStorage) ||
+            metadata > maximum - sizeof(LiveStorage) - base) {
+            throw LiveStorageLimit{};
+        }
+
+        return maximum;
+    }
+
+    std::size_t references_ = 1;              ///< Session and independent owners retain this epoch identity.
+    core::detail::RecordByteBudget physical_; ///< Pure state can outlive every operational owner.
+    std::size_t base_;          ///< Initial fixed reservation until transferred to the actual schema/session owners.
+    std::size_t owners_ = 0;    ///< Distinct snapshot, event and pending-output owners.
+    std::size_t maximumOwners_; ///< Finite simultaneous owner count, including candidates.
 
     public:
     /** Initialize an epoch after its own fixed allocation has been admitted.
@@ -45,10 +60,11 @@ class LiveStorage {
      * @param base Fixed configuration backing reservation, excluding this ledger.
      * @param owners Maximum simultaneous candidate or published owners.
      */
-    LiveStorage(std::size_t maximum, std::size_t base, std::size_t owners) noexcept
-        : resident_(sizeof(LiveStorage) + base), maximum_(maximum), peak_(resident_), base_(base),
-          maximumOwners_(owners) {
-        assert(maximum >= resident_);
+    LiveStorage(std::size_t maximum, std::size_t base, std::size_t owners)
+        : physical_(checkedMaximum(maximum, base)), base_(base), maximumOwners_(owners) {
+        const auto metadata = core::detail::RecordByteBudget::metadataAllocationBytes();
+
+        physical_.state()->reserve(sizeof(LiveStorage) + base + metadata);
     }
 
     /** Retain this opaque epoch; all related accesses and releases must be serialized. */
@@ -62,7 +78,8 @@ class LiveStorage {
         assert(references_ != 0);
 
         if (--references_ == 0) {
-            assert(resident_ == sizeof(LiveStorage) + base_ && owners_ == 0);
+            assert(owners_ == 0);
+            physical_.state()->used.fetch_sub(sizeof(LiveStorage) + base_, std::memory_order_relaxed);
             delete this;
         }
     }
@@ -91,39 +108,60 @@ class LiveStorage {
      * @return True after admission; false leaves the ledger unchanged.
      */
     [[nodiscard]] bool reserve(std::size_t bytes) noexcept {
-        if (bytes > maximum_ - resident_) {
+        try {
+            physical_.state()->reserve(bytes);
+
+            return true;
+        } catch (core::detail::RecordBlockError) {
             return false;
         }
-
-        resident_ += bytes;
-
-        if (resident_ > peak_) {
-            peak_ = resident_;
-        }
-
-        return true;
     }
 
     /** Release destroyed or unsuccessfully allocated backing without refunding caller work.
      * @param bytes Previously reserved allocation request size.
      */
     void relinquish(std::size_t bytes) noexcept {
-        assert(bytes <= resident_ - sizeof(LiveStorage));
-        resident_ -= bytes;
+        assert(bytes <= physical_.usedBytes() - sizeof(LiveStorage));
+        physical_.state()->used.fetch_sub(bytes, std::memory_order_relaxed);
     }
 
     /** Inspect requested bytes currently held by this epoch's owners.
      * @return Live requested byte count, including fixed metadata.
      */
     [[nodiscard]] std::size_t resident() const noexcept {
-        return resident_;
+        return physical_.usedBytes();
     }
 
     /** Inspect the highest admitted simultaneous ownership.
      * @return Requested byte peak since epoch creation, never a process RSS measurement.
      */
     [[nodiscard]] std::size_t peak() const noexcept {
-        return peak_;
+        return physical_.state()->peak.load(std::memory_order_relaxed);
+    }
+
+    /** Borrow pure allocation accounting without retaining the operational owner.
+     * @return Atomic epoch capacity state, safe through detached strong and weak release.
+     */
+    [[nodiscard]] const core::detail::RecordByteBudget &physical() const noexcept {
+        return physical_;
+    }
+
+    /** Transfer existing schema capacity to its pure owner without charging it twice.
+     * @param bytes Dynamic schema capacity included in the original base reservation.
+     * @return Independent reservation that may outlive this serialized ledger.
+     */
+    core::detail::RecordByteReservation transferBase(std::size_t bytes) noexcept {
+        assert(bytes <= base_);
+        base_ -= bytes;
+
+        return core::detail::RecordByteReservation::adopt(physical_.state(), bytes);
+    }
+
+    /** Transfer operational fixed backing to the session object that actually owns it.
+     * @return Reservation released after the session's framer and composer are destroyed.
+     */
+    core::detail::RecordByteReservation transferRemainingBase() noexcept {
+        return transferBase(base_);
     }
 };
 
@@ -405,33 +443,63 @@ struct OwnerLedger {
     }
 };
 
-/** Allocate one counted owner before invoking its constructor.
+/** One serialized owner slot and object request, reserved before candidate payload allocation. */
+class OwnerAdmission {
+    Storage &storage_;
+    const std::size_t bytes_;
+    bool active_ = true;
+
+    public:
+    /** Admit a slot before bytes, preserving configured refusal ahead of allocation faults.
+     * @param storage Serialized ledger kept alive by the active source operation.
+     * @param bytes Exact future object request, without its separately charged arena.
+     */
+    OwnerAdmission(Storage &storage, std::size_t bytes) : storage_(storage), bytes_(bytes) {
+        if (!storage_.reserveOwner())
+            throw LiveStorageLimit{};
+
+        if (!storage_.reserve(bytes_)) {
+            storage_.relinquishOwner();
+            throw LiveStorageLimit{};
+        }
+    }
+
+    OwnerAdmission(const OwnerAdmission &) = delete;
+    OwnerAdmission &operator=(const OwnerAdmission &) = delete;
+
+    /** Return an unpublished slot and object request exactly once. */
+    ~OwnerAdmission() {
+        if (active_) {
+            storage_.relinquish(bytes_);
+            storage_.relinquishOwner();
+        }
+    }
+
+    /** Transfer admission to the constructor's first noexcept OwnerLedger member.
+     * @param bytes Actual object request, checked against this permit.
+     * @return Borrowed ledger; the constructed owner now releases its admission.
+     */
+    Storage &adopt(std::size_t bytes) noexcept {
+        assert(active_ && bytes == bytes_);
+        active_ = false;
+
+        return storage_;
+    }
+};
+
+/** Allocate an object whose admission already precedes its candidate backing.
  * @tparam T Owner whose first member adopts an OwnerLedger without throwing.
  * @tparam Args Remaining constructor argument types.
- * @param storage Serialized epoch ledger.
+ * @param admission Unconsumed slot/object request, rolled back if allocation fails.
  * @param args Constructor arguments.
  * @return Complete owner; failure preserves previous owners.
  */
-template <typename T, typename... Args> std::unique_ptr<T> makeOwner(Storage &storage, Args &&...args) {
+template <typename T, typename... Args>
+std::unique_ptr<T> makeAdmittedOwner(OwnerAdmission &admission, Args &&...args) {
     static_assert(alignof(T) <= alignof(std::max_align_t));
+    auto *backing = ::operator new(sizeof(T));
+    auto &storage = admission.adopt(sizeof(T));
 
-    if (!storage.reserveOwner()) {
-        throw LiveStorageLimit{};
-    }
-
-    if (!storage.reserve(sizeof(T))) {
-        storage.relinquishOwner();
-        throw LiveStorageLimit{};
-    }
-
-    void *backing = nullptr;
-    try {
-        backing = ::operator new(sizeof(T));
-    } catch (...) {
-        storage.relinquish(sizeof(T));
-        storage.relinquishOwner();
-        throw;
-    }
     try {
         return std::unique_ptr<T>(new (backing) T(storage, std::forward<Args>(args)...));
     } catch (...) {
@@ -439,6 +507,19 @@ template <typename T, typename... Args> std::unique_ptr<T> makeOwner(Storage &st
         ::operator delete(backing);
         throw;
     }
+}
+
+/** Admit and allocate one ordinary serialized owner.
+ * @tparam T Owner with a first noexcept OwnerLedger member.
+ * @tparam Args Remaining constructor argument types.
+ * @param storage Serialized epoch ledger.
+ * @param args Constructor arguments.
+ * @return Complete owner or an atomic admission/allocation failure.
+ */
+template <typename T, typename... Args> std::unique_ptr<T> makeOwner(Storage &storage, Args &&...args) {
+    OwnerAdmission admission(storage, sizeof(T));
+
+    return makeAdmittedOwner<T>(admission, std::forward<Args>(args)...);
 }
 
 /** Scoped pre-admitted temporary backing, without a distinct retained-owner slot. */
@@ -459,6 +540,188 @@ struct TemporaryReservation {
     /** Release temporary ownership without refunding turn work. */
     ~TemporaryReservation() {
         storage.relinquish(bytes);
+    }
+};
+
+/** Pure local catalog, moved once after all session-creation allocations succeed. */
+struct ReceiveCatalog {
+    core::detail::RecordByteReservation reservation; ///< Original dynamic schema charge, outliving operational state.
+    std::optional<core::LocalSchema> schema;         ///< Engaged once by the final noexcept session construction.
+    const std::size_t capacityBytes; ///< Dynamic declarations plus actual catalog shared-control request.
+
+    /** Adopt the already charged dynamic schema capacity.
+     * @param storage Pure reservation transferred from the session's initial base.
+     * @param capacity Complete shared-control and dynamic declaration capacity.
+     */
+    ReceiveCatalog(core::detail::RecordByteReservation storage, std::size_t capacity) noexcept
+        : reservation(std::move(storage)), capacityBytes(capacity) {
+    }
+};
+
+/** Pure growth resource; release never visits a live session or its owner-slot ledger. */
+class ReceiveArenaUpstream final : public std::pmr::memory_resource {
+    std::shared_ptr<core::detail::RecordByteState> physical_;
+    const std::size_t maximum_;
+    std::size_t used_ = 0;
+
+    void *do_allocate(std::size_t bytes, std::size_t alignment) override {
+        if (bytes > maximum_ - used_)
+            throw LiveStorageLimit{};
+
+        try {
+            physical_->reserve(bytes);
+        } catch (core::detail::RecordBlockError) {
+            throw LiveStorageLimit{};
+        }
+
+        try {
+            auto *memory = std::pmr::new_delete_resource()->allocate(bytes, alignment);
+            used_ += bytes;
+
+            return memory;
+        } catch (...) {
+            physical_->used.fetch_sub(bytes, std::memory_order_relaxed);
+            throw;
+        }
+    }
+
+    void do_deallocate(void *memory, std::size_t bytes, std::size_t alignment) override {
+        std::pmr::new_delete_resource()->deallocate(memory, bytes, alignment);
+        used_ -= bytes;
+        physical_->used.fetch_sub(bytes, std::memory_order_relaxed);
+    }
+
+    bool do_is_equal(const std::pmr::memory_resource &other) const noexcept override {
+        return this == &other;
+    }
+
+    public:
+    /** Limit actual monotonic growth requests in one frame.
+     * @param physical Pure epoch byte domain, retained through final deallocation.
+     * @param maximum Remaining frame backing allowance.
+     */
+    ReceiveArenaUpstream(std::shared_ptr<core::detail::RecordByteState> physical, std::size_t maximum) noexcept
+        : physical_(std::move(physical)), maximum_(maximum) {
+    }
+
+    /** Inspect actual requested growth capacity.
+     * @return Complete outstanding upstream block bytes.
+     */
+    std::size_t capacityBytes() const noexcept {
+        return used_;
+    }
+};
+
+/** Frame backing and allocator with only pure atomic final-release dependencies. */
+class ReceiveArena {
+    core::detail::RecordByteReservation reservation_;
+    const std::size_t initial_;
+    std::unique_ptr<std::byte[]> backing_;
+    ReceiveArenaUpstream upstream_;
+    std::pmr::monotonic_buffer_resource resource_;
+
+    public:
+    /** Reserve before allocating, preserving the combined control/backing frame cap.
+     * @param physical Pure epoch accounting.
+     * @param initial Initial actual byte-array request.
+     * @param growth Maximum additional actual block requests.
+     */
+    ReceiveArena(const core::detail::RecordByteBudget &physical, std::size_t initial, std::size_t growth)
+        : reservation_(physical.state(), initial), initial_(initial),
+          backing_(std::make_unique_for_overwrite<std::byte[]>(initial)), upstream_(physical.state(), growth),
+          resource_(backing_.get(), initial, &upstream_) {
+    }
+
+    /** Resource destruction precedes initial backing and its reservation by member order. */
+    ~ReceiveArena() = default;
+
+    /** Borrow the permanent resource for decoder and immutable descriptors.
+     * @return Allocator valid until this arena dies.
+     */
+    std::pmr::memory_resource *resource() noexcept {
+        return &resource_;
+    }
+
+    /** Inspect all retained initial, growth, abandoned and spare capacity.
+     * @return Complete actual backing requests, excluding the shared owner control.
+     */
+    std::size_t capacityBytes() const noexcept {
+        return initial_ + upstream_.capacityBytes();
+    }
+};
+
+/** One frozen decoded frame; aliases retain no operational state or strong self references. */
+struct ReceiveRecordBatch : core::detail::SharedRecordPayload::Batch {
+    std::shared_ptr<const ReceiveCatalog> catalog;     ///< Complete local declarations and preserved provenance.
+    const core::detail::RecordSourceGeneration source; ///< Stable pure epoch and committed generation labels.
+    const std::size_t controlBytes; ///< Actual original allocate_shared request, retained through weak controls.
+    ReceiveArena arena;             ///< Permanent decoder and descriptor backing, destroyed after every PMR object.
+    detail::PmrStreamDataResult decoded;           ///< Owning exact values and complete physical source metadata.
+    std::pmr::vector<core::FieldValueView> fields; ///< Frozen core descriptors, without operational view dependencies.
+    std::pmr::vector<core::detail::SharedRecordPayload>
+        payloads; ///< Non-owning row descriptors; no strong self aliases.
+
+    /** Construct permanently before the decoder can create inline payload storage.
+     * @param physical Pure epoch capacity domain.
+     * @param binding Immutable complete local schema.
+     * @param generation Selected committed source generation.
+     * @param control Actual derived shared-control request.
+     * @param initial Initial frame backing request after control admission.
+     * @param growth Additional frame backing allowance.
+     */
+    ReceiveRecordBatch(const core::detail::RecordByteBudget &physical, std::shared_ptr<const ReceiveCatalog> binding,
+                       core::detail::RecordSourceGeneration generation, std::size_t control, std::size_t initial,
+                       std::size_t growth)
+        : Batch(std::unique_ptr<std::byte[]>{}, 0), catalog(std::move(binding)), source(generation),
+          controlBytes(control), arena(physical, initial, growth), decoded(*arena.resource()), fields(arena.resource()),
+          payloads(arena.resource()) {
+        selectionSensitive = true;
+        Batch::schema = &*catalog->schema;
+        Batch::sourceGeneration = source.generation;
+        Batch::sourceOrigin = source.origin;
+    }
+
+    /** Build final descriptors after decode has stopped moving even inline strings.
+     * @param work Remaining descriptor-construction credits.
+     */
+    void complete(LiveWork &work) {
+        std::size_t count = 0;
+
+        for (const auto &record : decoded.records) {
+            debit(1, work.visits);
+            count = sum(count, record.typedValues.size());
+        }
+
+        debit(sum(count, decoded.records.size()), work.visits);
+        fields.reserve(count);
+        payloads.reserve(decoded.records.size());
+
+        for (const auto &record : decoded.records) {
+            const auto start = fields.size();
+            auto bytes = sum(product(record.symbol.units.size(), sizeof(char16_t)),
+                             product(record.typedValues.size(), sizeof(core::FieldValueView)));
+
+            for (const auto &field : record.typedValues) {
+                fields.push_back(
+                    {field.type, field.raw,
+                     field.units ? std::optional<std::u16string_view>{*field.units} : std::nullopt,
+                     field.bytes ? std::optional<std::span<const std::byte>>{*field.bytes} : std::nullopt});
+                bytes = sum(bytes, field.units ? product(field.units->size(), sizeof(char16_t)) : 0);
+                bytes = sum(bytes, field.bytes ? field.bytes->size() : 0);
+            }
+
+            payloads.emplace_back(
+                this, std::u16string_view(record.symbol.units),
+                std::span<const core::FieldValueView>(fields).subspan(start, record.typedValues.size()), bytes);
+        }
+
+        rows = payloads.data();
+    }
+
+    /** Publish the final complete retained capacity after wrapper descriptors are allocated. */
+    void freeze() noexcept {
+        bytes = arena.capacityBytes() + controlBytes + catalog->capacityBytes -
+                core::detail::SharedRecordPayload::controlBytes();
     }
 };
 
@@ -1391,6 +1654,7 @@ struct LiveEvent::State {
     std::optional<TemporaryReservation> sharedReservation; ///< Serialized charge while external bytes remain retained.
     LiveSnapshot snapshot;                                 ///< Independently retained immutable peer generation.
     LiveEventKind kind;                                    ///< Whole-envelope kind.
+    std::shared_ptr<ReceiveRecordBatch> received;          ///< Pure network payload; wrapper release stays serialized.
     std::optional<std::int32_t> messageType;     ///< Original message type, absent only for an empty envelope.
     std::optional<LiveHeartbeat> heartbeat;      ///< Selected explicit type0 fields.
     detail::PmrStreamDataResult decoded;         ///< Complete decoded owner, unpublished on failure.
@@ -1404,11 +1668,15 @@ struct LiveEvent::State {
      * @param peer Immutable peer-generation handle.
      * @param value Whole-frame kind.
      * @param growth Optional additional backing allowance for DATA.
+     * @param receive Optional pure decoded-data owner; its arena also holds wrapper-only descriptors.
      */
-    State(Storage &storage, std::size_t bytes, LiveSnapshot peer, LiveEventKind value, std::size_t growth = 0)
+    State(Storage &storage, std::size_t bytes, LiveSnapshot peer, LiveEventKind value, std::size_t growth = 0,
+          std::shared_ptr<ReceiveRecordBatch> receive = {})
         : ledger(storage, sizeof(State)), arena(storage, bytes, growth), snapshot(std::move(peer)), kind(value),
-          decoded(*arena.resource()), fields(arena.resource()), records(arena.resource()),
-          sharedRows(arena.resource()) {
+          received(std::move(receive)), decoded(*arena.resource()),
+          fields(received ? received->arena.resource() : arena.resource()),
+          records(received ? received->arena.resource() : arena.resource()),
+          sharedRows(received ? received->arena.resource() : arena.resource()) {
     }
 
     /** Build views only after the whole data decoder succeeds.
@@ -1416,6 +1684,33 @@ struct LiveEvent::State {
      * @param tapeMessageTimeMs Optional inherited tape MESSAGE cursor time, absent on network input.
      */
     void complete(LiveWork &work, std::optional<std::int64_t> tapeMessageTimeMs = std::nullopt) {
+        if (received) {
+            received->complete(work);
+            debit(sum(received->fields.size(), received->decoded.records.size()), work.visits);
+            fields.reserve(received->fields.size());
+            records.reserve(received->decoded.records.size());
+            sharedRows.reserve(received->decoded.records.size());
+
+            for (std::size_t i = 0; i < received->decoded.records.size(); ++i) {
+                const auto &record = received->decoded.records[i];
+                const auto &payload = received->payloads[i];
+                const auto start = fields.size();
+
+                for (const auto &field : payload.fields())
+                    fields.push_back({field.type, field.raw, field.units, field.bytes});
+
+                records.push_back({record.localId, record.senderId, record.context, payload.symbol(),
+                                   record.symbol.cipher, record.symbol.eventFlags, record.values,
+                                   std::span(fields).subspan(start, payload.fields().size()), record.removalTime,
+                                   record.fieldTime, tapeMessageTimeMs});
+                sharedRows.emplace_back(received, &payload);
+            }
+
+            received->freeze();
+
+            return;
+        }
+
         std::size_t count = 0;
 
         for (const auto &record : decoded.records) {
@@ -2068,12 +2363,13 @@ LiveHeartbeat heartbeat(std::span<const std::byte> payload, LiveWork &work) {
 } // namespace
 
 struct LiveSession::Impl {
-    LiveStorageLease lease;              ///< Destroyed last, retaining conservative fixed configuration accounting.
-    LiveLimits limits;                   ///< Immutable finite bounds and profile choices.
-    core::LocalSchema schema;            ///< Immutable local configuration/provenance.
-    SubscriptionWriter composer;         ///< Fresh outgoing layouts and exact composer output credits.
-    std::unique_ptr<FrameReader> framer; ///< Independent fixed framing state.
-    LiveSnapshot peer;                   ///< Current complete immutable protocol/binding generation.
+    LiveStorageLease lease;                              ///< Destroyed last, after actual owners and backing.
+    core::detail::RecordByteReservation baseReservation; ///< Fixed backing follows its actual operational owner.
+    LiveLimits limits;                                   ///< Immutable finite bounds and profile choices.
+    std::shared_ptr<ReceiveCatalog> catalog;    ///< Pure immutable schema owned once for all receive generations.
+    SubscriptionWriter composer;                ///< Fresh outgoing layouts and exact composer output credits.
+    std::unique_ptr<FrameReader> framer;        ///< Independent fixed framing state.
+    LiveSnapshot peer;                          ///< Current complete immutable protocol/binding generation.
     LiveStatus status = LiveStatus::NEED_INPUT; ///< Input lifecycle.
     LiveDiagnostic diagnostic;                  ///< First terminal static/numeric evidence.
     LiveInputStatistics statistics;             ///< Serialized framing/commit totals, independent of event retention.
@@ -2085,14 +2381,24 @@ struct LiveSession::Impl {
      * @param storage Ledger retained by the first member.
      * @param bounds Immutable limits.
      * @param local Validated local schema.
+     * @param binding Preallocated pure catalog, populated only after every allocation succeeds.
      * @param writer Fresh matching composer.
      * @param frame Fully allocated independent framer.
      * @param snapshot Complete initial peer generation.
      */
-    Impl(Storage &storage, LiveLimits bounds, core::LocalSchema &&local, SubscriptionWriter &&writer,
-         std::unique_ptr<FrameReader> frame, LiveSnapshot snapshot) noexcept
-        : lease(&storage), limits(bounds), schema(std::move(local)), composer(std::move(writer)),
-          framer(std::move(frame)), peer(std::move(snapshot)) {
+    Impl(Storage &storage, LiveLimits bounds, core::LocalSchema &&local, std::shared_ptr<ReceiveCatalog> binding,
+         SubscriptionWriter &&writer, std::unique_ptr<FrameReader> frame, LiveSnapshot snapshot) noexcept
+        : lease(&storage), baseReservation(storage.transferRemainingBase()), limits(bounds),
+          catalog(std::move(binding)), composer(std::move(writer)), framer(std::move(frame)),
+          peer(std::move(snapshot)) {
+        catalog->schema.emplace(std::move(local));
+    }
+
+    /** Borrow the immutable pure catalog for serialized binding and outgoing composition.
+     * @return Local schema retained independently by every receive batch using it.
+     */
+    const core::LocalSchema &schema() const noexcept {
+        return *catalog->schema;
     }
 
     /** Record the first terminal input failure without retaining peer text.
@@ -2149,7 +2455,7 @@ struct LiveSession::Impl {
             return left.senderId < right.senderId;
         });
         IncomingSubscriptionWork input{work.operations, work.bytes, work.visits, work.textUnits};
-        auto result = decodeIncomingSubscription(frame, schema, mapping, *subscriptions, input);
+        auto result = decodeIncomingSubscription(frame, schema(), mapping, *subscriptions, input);
         work = {input.frames, input.visits, input.textUnits, input.inputBytes};
 
         if (result)
@@ -2181,7 +2487,7 @@ struct LiveSession::Impl {
         }
 
         auto next =
-            makeOwner<LiveSnapshot::State>(*lease.get(), limits.snapshotBytes, schema.profile(), generation + 1);
+            makeOwner<LiveSnapshot::State>(*lease.get(), limits.snapshotBytes, schema().profile(), generation + 1);
         next->cloneFrom(*peer.state_, work);
 
         return next;
@@ -2216,7 +2522,8 @@ struct LiveSession::Impl {
             mergeMessages(next->protocol.send, incoming.send, *next->arena.resource(), work);
             mergeMessages(next->protocol.receive, incoming.receive, *next->arena.resource(), work);
             next->protocol.received = true;
-            next->complete(schema, limits.context, limits.fieldTime, limits.protocol, work, subscriptions.has_value());
+            next->complete(schema(), limits.context, limits.fieldTime, limits.protocol, work,
+                           subscriptions.has_value());
             kind = LiveEventKind::PROTOCOL;
         } else if (frame.type == DESCRIBE_RECORDS) {
             diagnostic.stage = "descriptions";
@@ -2232,7 +2539,8 @@ struct LiveSession::Impl {
 
             next = candidate(work);
             next->mergeDescriptions(incoming.descriptions, work);
-            next->complete(schema, limits.context, limits.fieldTime, limits.protocol, work, subscriptions.has_value());
+            next->complete(schema(), limits.context, limits.fieldTime, limits.protocol, work,
+                           subscriptions.has_value());
             kind = LiveEventKind::DESCRIPTIONS;
         } else if (frame.type == TICKER_DATA || frame.type == STREAM_DATA || frame.type == HISTORY_DATA) {
             if (subscriptions)
@@ -2260,24 +2568,60 @@ struct LiveSession::Impl {
         const auto bytes =
             variableArena ? std::min(limits.dataEventBytes, DATA_INITIAL_BLOCK_BYTES) : limits.eventBytes;
         const auto growth = variableArena ? limits.dataEventBytes - bytes : 0;
-        auto event = makeOwner<LiveEvent::State>(*lease.get(), bytes, selected, kind, growth);
+        // The validated profile determines legacy output before parsing, without another decode.
+        const bool detached =
+            kind == LiveEventKind::DATA && selected.state_->context.profile() != core::LocalProfile::COMPACT_INT_V1;
+        std::optional<OwnerAdmission> admission;
+        std::shared_ptr<ReceiveRecordBatch> received;
+
+        if (detached) {
+            admission.emplace(*lease.get(), sizeof(LiveEvent::State));
+            const auto &physical = lease.get()->physical();
+            const core::detail::RecordSourceGeneration source{
+                static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(physical.state().get())),
+                selected.state_->generation};
+            std::shared_ptr<const ReceiveCatalog> binding = catalog;
+            const auto control =
+                core::detail::recordControlBytes<ReceiveRecordBatch>(physical, binding, source, 0, 0, 0);
+            const auto maximum = variableArena ? limits.dataEventBytes : limits.eventBytes;
+
+            if (control > maximum)
+                throw LiveStorageLimit{};
+
+            const auto initial =
+                variableArena ? std::min(maximum - control, DATA_INITIAL_BLOCK_BYTES) : maximum - control;
+
+            try {
+                received = std::allocate_shared<ReceiveRecordBatch>(
+                    core::detail::RecordBlockAllocator<ReceiveRecordBatch>{physical.state()}, physical,
+                    std::move(binding), source, control, initial, maximum - control - initial);
+            } catch (core::detail::RecordBlockError) {
+                throw LiveStorageLimit{};
+            }
+        }
+
+        auto event = detached
+                         ? makeAdmittedOwner<LiveEvent::State>(*admission, 0, selected, kind, 0, std::move(received))
+                         : makeOwner<LiveEvent::State>(*lease.get(), bytes, selected, kind, growth);
         event->messageType = frame.type;
         event->heartbeat = beat;
 
         if (kind == LiveEventKind::DATA) {
             diagnostic.stage = "data";
             chargeData(limits.data, selected.state_->descriptions.size(), frame.payload.size(), work, variableArena);
-            event->decoded = detail::decodePmrStreamData(frame.payload, selected.state_->context, limits.data,
-                                                         limits.events, *event->arena.resource(), variableArena);
-            diagnostic.consumed = event->decoded.consumed;
-            diagnostic.detail = static_cast<std::size_t>(event->decoded.stage);
+            auto &decoded = event->received ? event->received->decoded : event->decoded;
+            auto *resource = event->received ? event->received->arena.resource() : event->arena.resource();
+            decoded = detail::decodePmrStreamData(frame.payload, selected.state_->context, limits.data, limits.events,
+                                                  *resource, variableArena);
+            diagnostic.consumed = decoded.consumed;
+            diagnostic.detail = static_cast<std::size_t>(decoded.stage);
 
-            if (event->decoded.status != StreamDataStatus::OK) {
-                throw dataError(event->decoded.status);
+            if (decoded.status != StreamDataStatus::OK) {
+                throw dataError(decoded.status);
             }
 
             event->complete(work);
-            statistics.dataRecords.add(event->decoded.processedRecords);
+            statistics.dataRecords.add(decoded.processedRecords);
         }
 
         auto nextAuthentication = authentication;
@@ -2501,9 +2845,11 @@ LiveSnapshot LiveEvent::snapshot() const noexcept {
 
 std::size_t LiveEvent::residentBytes() const noexcept {
     // Both reservations coexist in one finite ledger, so their sum is representable.
-    return state_ ? sizeof(State) + state_->arena.capacityBytes() +
-                        (state_->sharedReservation ? state_->sharedReservation->bytes : 0)
-                  : 0;
+    return state_
+               ? sizeof(State) + state_->arena.capacityBytes() +
+                     (state_->sharedReservation ? state_->sharedReservation->bytes : 0) +
+                     (state_->received ? state_->received->arena.capacityBytes() + state_->received->controlBytes : 0)
+               : 0;
 }
 
 bool detail::SharedRecordAccess::hasSharedRecords(const LiveEvent &event) noexcept {
@@ -2533,6 +2879,11 @@ detail::SharedRecordAccess::retain(const LiveEvent &event, const LiveRecordView 
 
 std::size_t LiveEvent::releaseBytes() const noexcept {
     return state_ ? state_->ledger.lease.get()->resident() : 0;
+}
+
+std::shared_ptr<core::detail::RecordByteState>
+detail::SharedRecordAccess::physicalState(const LiveEvent &event) noexcept {
+    return event.state_ ? event.state_->ledger.lease.get()->physical().state() : nullptr;
 }
 
 LivePendingOutput::LivePendingOutput(std::unique_ptr<State> state) noexcept : state_(std::move(state)) {
@@ -2600,9 +2951,9 @@ std::expected<LiveSession, LiveError> LiveSession::create(core::LocalSchema &&sc
             return std::unexpected(Error::INVALID_CONFIGURATION);
         }
 
-        const auto base =
-            sum(sum(sizeof(Impl), sizeof(FrameReader)), sum(sum(schema.storageBytes(), composer.storageBytes()),
-                                                            sum(limits.frame.maximumBodyBytes, PREFIX_BYTES)));
+        const auto base = sum(sum(sizeof(Impl), sizeof(FrameReader)),
+                              sum(sum(schema.storageBytes() - sizeof(core::LocalSchema), composer.storageBytes()),
+                                  sum(limits.frame.maximumBodyBytes, PREFIX_BYTES)));
 
         if (sum(base, sizeof(Storage)) > limits.residentBytes) {
             return std::unexpected(Error::RESOURCE_LIMIT);
@@ -2621,10 +2972,23 @@ std::expected<LiveSession, LiveError> LiveSession::create(core::LocalSchema &&sc
         auto snapshot = makeOwner<LiveSnapshot::State>(*storage, limits.snapshotBytes, schema.profile(), 0);
         snapshot->complete(schema, limits.context, limits.fieldTime, limits.protocol, work);
         LiveSnapshot initial(snapshot.release());
+        const auto schemaBytes = schema.storageBytes() - sizeof(core::LocalSchema);
+        const auto catalogControl =
+            core::detail::recordControlBytes<ReceiveCatalog>(core::detail::RecordByteReservation{}, std::size_t{0});
+        auto catalog = [&] {
+            try {
+                return std::allocate_shared<ReceiveCatalog>(
+                    core::detail::RecordBlockAllocator<ReceiveCatalog>{storage->physical().state()},
+                    storage->transferBase(schemaBytes), sum(schemaBytes, catalogControl));
+            } catch (core::detail::RecordBlockError) {
+                throw LiveStorageLimit{};
+            }
+        }();
         static_assert(std::is_nothrow_move_constructible_v<core::LocalSchema>);
         static_assert(std::is_nothrow_move_constructible_v<SubscriptionWriter>);
-        auto implementation = std::unique_ptr<Impl>(
-            new Impl(*storage, limits, std::move(schema), std::move(composer), std::move(framer), std::move(initial)));
+        auto implementation =
+            std::unique_ptr<Impl>(new Impl(*storage, limits, std::move(schema), std::move(catalog), std::move(composer),
+                                           std::move(framer), std::move(initial)));
 
         return LiveSession(std::move(implementation));
     } catch (Error error) {
