@@ -44,3 +44,5 @@ marker ff внутри frame и новые 0443 bytes в следующем fram
 [Java coverage](../../tests/fixtures/encoding/symbols/COVERAGE.ru.md) и
 [валидация C++](../../tests/conformance/encoding/symbols/VALIDATION.ru.md) заменяют прежний source-only
 статус строки symbols для этого ограниченного подмножества. Нет writer, event decoder, negotiation и транспорта.
+
+[Учёт байтов полезной нагрузки переменной длины](VARIABLE-PAYLOAD-BYTES.ru.md) описывает бюджеты полей, владение и работу.
