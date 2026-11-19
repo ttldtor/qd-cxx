@@ -127,6 +127,39 @@ Borrowed model revision views likewise stay in their serial notification domain;
 cross-thread model reads require an immutable owning snapshot with revision, source generation and
 completeness. Retaining a record batch does not create such a model snapshot or prove history complete.
 
+## Internal schema-bound storage candidate
+
+The private `SharedRecordBlock` candidate extends the existing `SharedRecordPayload::Batch` through
+an actual derived shared-control owner. A binding takes a complete already owned `LocalSchema` once,
+preserving provenance, and exact caller-supplied source-origin/generation labels. These pure numeric
+labels carry no authentication or global uniqueness guarantee. Blocks reuse the immutable binding;
+no transport, executor or callback owner is retained. Exact nullable fields, raw values and physical
+source metadata reside in one packed block. All record contexts and field shapes are validated first.
+
+Copy admission reserves the full requested block backing/control capacity atomically before allocation.
+Binding creation likewise reserves its full control/schema-capacity amount before moving the input
+schema. Failure publishes no partial owner and preserves the input schema/records and existing borrows.
+`CAPACITY_EXCEEDED` identifies permanent oversize; `WOULD_BLOCK` identifies temporary outstanding
+reservations. Allocation failure rolls back reservations. These private errors add no public API.
+
+A range retain allocates and copies no payload, reserves the complete retained block/binding capacity
+in an independent consumer byte domain, and returns a move-only quota lease. Independent contiguous
+range copying owns a new, potentially smaller packed array and shares the binding. Neither operation
+imposes a record-count ceiling. Separate immutable owners support reads and final release on any thread;
+mutating the same handle still needs synchronization. Actual shared-control requests remain charged
+through weak-control lifetime, and backing is freed before its reservation is returned.
+
+Block copy/request counters separate copied payload, field/row/source metadata, padding, backing and
+shared control. Binding and byte-domain controls are reported separately. Schema capacity uses the
+existing `LocalSchema::storageBytes()` model; schema acquisition/copy allocations, allocator overhead
+and RSS are separate observations. The [design decision](../../docs/decisions/ADR-0015-shared-record-blocks.md)
+records the complete boundary accounting and its limits.
+
+The candidate is exercised through the existing local event → STREAM collector → MUX shared-payload
+path. Its complete binding/source metadata survive inside the retained owner; existing public MUX
+views still expose their current represented metadata and provenance. This is a storage candidate,
+not the public RecordFeed, whole production pipeline migration or common cross-component ledger.
+Existing public retention/reservation and `LiveEvent` release-affinity contracts remain in force.
 ## Verification and traceability
 
 The source-backed current contract is exercised by
